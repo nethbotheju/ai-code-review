@@ -1,5 +1,6 @@
 # Copy this into your project at .github/workflows/ai-code-review.yml
-# Then set repository secrets: LLM_API_TYPE, LLM_MODEL, LLM_API_KEY (and LLM_BASE_URL if needed).
+# Only the API key is a secret — add a repository secret named AI_CODE_REVIEW_LLM_API_KEY.
+# Everything else (provider, model, base URL) is plain config you edit directly below.
 #
 # The review runs when:
 #   - someone adds the "ai-review" label to a PR, OR
@@ -41,9 +42,9 @@ jobs:
       - name: AI code review
         uses: your-org/ai-code-review@v1
         with:
-          api-type: ${{ secrets.LLM_API_TYPE }}
-          base-url: ${{ secrets.LLM_BASE_URL }}
-          model: ${{ secrets.LLM_MODEL }}
-          api-key: ${{ secrets.LLM_API_KEY }}
+          api-type: openai            # openai | openai-compatible | anthropic
+          model: gpt-4o               # your model
+          # base-url: 'http://opencode.ai/zen/go/v1'   # set ONLY for openai-compatible
+          api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
           # auto-review: 'true'      # uncomment to review on open/reopen/push automatically
           # extra-instructions: 'Follow the project's naming conventions...'

@@ -1,7 +1,7 @@
 # Self-test: this action reviews pull requests on its own repository.
 # Opt-in — only runs when the trigger label/command is used, and requires the
-# following repository secrets to be set: LLM_API_TYPE, LLM_MODEL, LLM_API_KEY
-# (and LLM_BASE_URL for openai-compatible providers).
+# repository secret AI_CODE_REVIEW_LLM_API_KEY to be set. Edit the provider/model
+# below to match the key you configured.
 
 name: self-test
 
@@ -33,7 +33,7 @@ jobs:
       - name: Run this action locally
         uses: ./
         with:
-          api-type: ${{ secrets.LLM_API_TYPE }}
-          base-url: ${{ secrets.LLM_BASE_URL }}
-          model: ${{ secrets.LLM_MODEL }}
-          api-key: ${{ secrets.LLM_API_KEY }}
+          api-type: openai
+          model: gpt-4o
+          # base-url: ''   # set if testing openai-compatible
+          api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}

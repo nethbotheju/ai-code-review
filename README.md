@@ -17,14 +17,12 @@ result back as a **PR review with inline line comments** plus a summary — neve
 1. Add the workflow below to your repo at `.github/workflows/ai-code-review.yml`
    (also available in [`examples/workflow.yml`](./examples/workflow.yml)).
 2. Replace `your-org/ai-code-review` with the real reference and pin it (e.g. `@v1`).
-3. Add repository **secrets**:
+3. Edit config (`api-type`, `model`, `base-url`) directly in the workflow file.
+4. Add **one** repository secret for the API key (everything else is plain config, not a secret):
 
    | Secret | Required | Example |
    | --- | --- | --- |
-   | `LLM_API_KEY` | yes | your provider API key |
-   | `LLM_API_TYPE` | yes | `openai`, `openai-compatible`, or `anthropic` |
-   | `LLM_MODEL` | yes | `gpt-4o`, `claude-3-5-sonnet-20241022`, … |
-   | `LLM_BASE_URL` | only for `openai-compatible` | `http://localhost:11434/v1` |
+   | `AI_CODE_REVIEW_LLM_API_KEY` | yes | your provider API key |
 
 ```yaml
 name: ai-code-review
@@ -53,10 +51,10 @@ jobs:
     steps:
       - uses: your-org/ai-code-review@v1
         with:
-          api-type: ${{ secrets.LLM_API_TYPE }}
-          base-url: ${{ secrets.LLM_BASE_URL }}
-          model: ${{ secrets.LLM_MODEL }}
-          api-key: ${{ secrets.LLM_API_KEY }}
+          api-type: openai            # openai | openai-compatible | anthropic
+          model: gpt-4o               # your model
+          # base-url: 'http://opencode.ai/zen/go/v1'   # set ONLY for openai-compatible
+          api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
           # auto-review: 'true'           # review on open/reopen/push automatically
           # extra-instructions: '...'
 ```
