@@ -49,7 +49,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: your-org/ai-code-review@v1
+      - uses: nethbotheju/ai-code-review@v1
         with:
           api-type: openai            # openai | openai-compatible | anthropic
           model: gpt-4o               # your model
