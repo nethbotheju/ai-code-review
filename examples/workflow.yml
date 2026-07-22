@@ -1,0 +1,49 @@
+# Copy this into your project at .github/workflows/ai-code-review.yml
+# Then set repository secrets: LLM_API_TYPE, LLM_MODEL, LLM_API_KEY (and LLM_BASE_URL if needed).
+#
+# The review runs when:
+#   - someone adds the "ai-review" label to a PR, OR
+#   - someone comments "/ai-review" on a PR.
+# To ALSO review automatically on open / reopen / push, set `auto-review: 'true'`.
+#
+# Replace `your-org/ai-code-review` with the real org/repo of this action,
+# and pin it to a tag (e.g. @v1).
+
+name: ai-code-review
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+  issue_comment:
+    types: [created]
+
+# Avoid duplicate runs when a user comments and labels in quick succession.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    # Only run when it is a PR and the trigger (label OR slash command) matches.
+    if: |
+      (github.event_name == 'pull_request' &&
+        (github.event.action != 'labeled' || github.event.label.name == 'ai-review'))
+      || (github.event_name == 'issue_comment' &&
+        startsWith(github.event.comment.body, '/ai-review') &&
+        github.event.issue.pull_request != null)
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: AI code review
+        uses: your-org/ai-code-review@v1
+        with:
+          api-type: ${{ secrets.LLM_API_TYPE }}
+          base-url: ${{ secrets.LLM_BASE_URL }}
+          model: ${{ secrets.LLM_MODEL }}
+          api-key: ${{ secrets.LLM_API_KEY }}
+          # auto-review: 'true'      # uncomment to review on open/reopen/push automatically
+          # extra-instructions: 'Follow the project's naming conventions...'

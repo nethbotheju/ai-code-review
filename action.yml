@@ -1,0 +1,68 @@
+name: 'AI Code Review'
+description: 'AI-powered pull request code review. Bring your own key (OpenAI, OpenAI-compatible, or Anthropic). Triggered by a label or a slash command.'
+author: 'your-org'
+branding:
+  icon: 'eye'
+  color: 'purple'
+
+inputs:
+  api-type:
+    description: 'LLM API protocol: openai | openai-compatible | anthropic'
+    required: true
+  api-key:
+    description: 'API key for the LLM provider (BYOK). Store this in a secret.'
+    required: true
+  base-url:
+    description: 'Base URL of the API. Required for openai-compatible. Optional override for openai/anthropic.'
+    required: false
+  model:
+    description: 'Model identifier to use for the review (e.g. gpt-4o, claude-3-5-sonnet-20241022).'
+    required: true
+
+  github-token:
+    description: 'GitHub token used to read the PR and post the review. Defaults to the automatic workflow token.'
+    required: false
+    default: ${{ github.token }}
+
+  trigger-comment:
+    description: 'Slash command that triggers a review on a PR comment (case-insensitive).'
+    required: false
+    default: '/ai-review'
+  trigger-label:
+    description: 'PR label that triggers a review when added.'
+    required: false
+    default: 'ai-review'
+  auto-review:
+    description: 'When true, also review automatically on PR open/reopen/push (synchronize) without a label or command.'
+    required: false
+    default: 'false'
+
+  max-files:
+    description: 'Maximum number of changed files to review per run.'
+    required: false
+    default: '20'
+  max-diff-lines:
+    description: 'Maximum total added lines to review per run (protects token budget).'
+    required: false
+    default: '3000'
+  exclude-patterns:
+    description: 'Additional glob patterns to exclude (newline or comma separated), e.g. *.generated.ts, vendor/**'
+    required: false
+    default: ''
+  use-default-excludes:
+    description: 'Apply the built-in excludes for lockfiles, minified files, build/dist output, etc.'
+    required: false
+    default: 'true'
+
+  extra-instructions:
+    description: 'Extra review guidance appended to the prompt (e.g. project conventions, style rules).'
+    required: false
+    default: ''
+
+outputs:
+  summary:
+    description: 'The plain-text review summary produced by the model.'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
