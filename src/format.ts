@@ -1,95 +1,77 @@
-import { Finding, Severity } from './types';
+import { ChangedFile, ReviewDocument } from './types';
 
-const SEVERITY_META: Record<Severity, { icon: string; label: string }> = {
-  critical: { icon: '🔴', label: 'Critical' },
-  warning: { icon: '🟠', label: 'Warning' },
-  suggestion: { icon: '🔵', label: 'Suggestion' },
-  nit: { icon: '⚪', label: 'Nit' },
+const CHANGE_TYPE: Record<string, string> = {
+  added: 'Added',
+  modified: 'Modified',
+  removed: 'Removed',
+  renamed: 'Renamed',
+  copied: 'Copied',
+  changed: 'Changed',
 };
 
-export function formatInlineComment(f: Finding): string {
-  const meta = SEVERITY_META[f.severity] ?? SEVERITY_META.suggestion;
-  const lines: string[] = [`**${meta.icon} ${meta.label}**`, '', f.comment];
-  if (f.suggestion) {
-    lines.push('', `**How to fix:** ${f.suggestion}`);
+export function formatReview(doc: ReviewDocument, files: ChangedFile[]): string {
+  const out: string[] = [];
+
+  out.push('### Issue / Background', '');
+  out.push(doc.background.trim() || '_No background provided._', '');
+
+  out.push('### Proposed Solution', '');
+  out.push(doc.solution.trim() || '_No solution assessment provided._', '');
+
+  out.push('## Summary of File Changes', '');
+  out.push('| File Path | Change Type | Description |');
+  out.push('| :--- | :--- | :--- |');
+  const descriptions = new Map(doc.files.map((f) => [f.path, f.description]));
+  for (const f of files) {
+    const changeType = CHANGE_TYPE[f.status] ?? capitalize(f.status);
+    const description =
+      descriptions.get(f.filename)?.trim() ||
+      `${f.additions} addition(s), ${f.deletions} deletion(s)`;
+    out.push(`| \`${f.filename}\` | ${changeType} | ${cell(description)} |`);
   }
-  return lines.join('\n');
-}
+  out.push('');
 
-export interface SummaryOptions {
-  summary: string;
-  findings: Finding[];
-  reviewedFiles: number;
-  totalFiles: number;
-  truncated: boolean;
-  truncatedReason?: string;
-  unmapped: Finding[];
-  model: string;
-  apiType: string;
-}
-
-export function formatSummary(opts: SummaryOptions): string {
-  const counts = countBySeverity(opts.findings);
-  const lines: string[] = ['## 🤖 AI Code Review', ''];
-
-  lines.push(
-    `Reviewed **${opts.reviewedFiles}** of **${opts.totalFiles}** changed file(s) · **${opts.findings.length}** finding(s).`,
-    ''
-  );
-
-  if (opts.truncated) {
-    lines.push(
-      `> ⚠️ This review was limited to fit the model's context (${opts.truncatedReason}). Additional files were not reviewed.`,
-      ''
-    );
+  const tests = inline(doc.tests);
+  if (tests) {
+    out.push('## Testing', '');
+    out.push(tests);
+    out.push('');
   }
 
-  lines.push('| Severity | Count |', '| --- | --- |');
-  for (const key of ['critical', 'warning', 'suggestion', 'nit'] as Severity[]) {
-    lines.push(`| ${SEVERITY_META[key].icon} ${SEVERITY_META[key].label} | ${counts[key]} |`);
-  }
-  lines.push('');
-
-  lines.push('### Overview', opts.summary.trim() || '_No summary provided._', '');
-
-  if (opts.unmapped.length > 0) {
-    lines.push('<details><summary>📌 General findings (not tied to a specific diff line)</summary>', '');
-    for (const f of opts.unmapped) {
-      const meta = SEVERITY_META[f.severity] ?? SEVERITY_META.suggestion;
-      lines.push(`**${meta.icon} ${meta.label} — \`${f.file}\`**`, f.comment);
-      if (f.suggestion) lines.push(`_How to fix:_ ${f.suggestion}`);
-      lines.push('');
+  out.push('## Recommendations & Enhancements', '');
+  if (doc.recommendations.length === 0) {
+    out.push('_No high-level recommendations; the change looks solid._');
+  } else {
+    for (const r of doc.recommendations) {
+      out.push(`- **[${r.category}]:** ${inline(r.note)}`);
     }
-    lines.push('</details>', '');
   }
+  out.push('');
 
-  lines.push(
-    '---',
-    `_Automated review using \`${opts.model}\` via \`${opts.apiType}\`. Findings are recommendations, not blocking checks._`
-  );
+  out.push('---', '_Automated review using AI Code Review._');
 
-  return lines.join('\n');
+  return out.join('\n');
 }
 
 export function formatNoChanges(): string {
   return [
-    '## 🤖 AI Code Review',
+    '### Issue / Background',
     '',
     'No reviewable code changes were found (only excluded, generated, deleted, or binary files).',
     '',
-    '_Review skipped._',
+    '---',
+    '_Automated review using AI Code Review._',
   ].join('\n');
 }
 
-function countBySeverity(findings: Finding[]): Record<Severity, number> {
-  const counts: Record<Severity, number> = {
-    critical: 0,
-    warning: 0,
-    suggestion: 0,
-    nit: 0,
-  };
-  for (const f of findings) {
-    counts[f.severity] += 1;
-  }
-  return counts;
+function cell(text: string): string {
+  return text.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
+}
+
+function inline(text: string): string {
+  return text.replace(/\r?\n/g, ' ').trim();
+}
+
+function capitalize(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Modified';
 }

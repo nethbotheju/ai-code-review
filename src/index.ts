@@ -6,8 +6,7 @@ import { fetchChangedFiles, fetchPullRequest } from './diff';
 import { buildSystemPrompt, buildUserPrompt } from './prompt';
 import { createProvider } from './llm/factory';
 import { parseReview } from './parse';
-import { mapFindings } from './review';
-import { formatNoChanges, formatSummary } from './format';
+import { formatNoChanges, formatReview } from './format';
 import { postReview, reactToComment } from './github';
 
 async function run(): Promise<void> {
@@ -47,30 +46,15 @@ async function run(): Promise<void> {
 
     const provider = createProvider(inputs);
     const raw = await provider.complete(systemPrompt, userPrompt);
-    core.info('Received model response; parsing findings...');
+    core.info('Received model response; parsing...');
 
-    const result = parseReview(raw);
-    const mapped = mapFindings(result.findings, fetchResult.files);
+    const doc = parseReview(raw);
+    const body = formatReview(doc, fetchResult.files);
 
-    const body = formatSummary({
-      summary: result.summary,
-      findings: result.findings,
-      reviewedFiles: fetchResult.reviewedFiles,
-      totalFiles: fetchResult.totalFiles,
-      truncated: fetchResult.truncated,
-      truncatedReason: fetchResult.truncatedReason,
-      unmapped: mapped.unmapped,
-      model: inputs.model,
-      apiType: inputs.apiType,
-    });
+    await postReview(octokit, owner, repo, pullNumber, pr.headSha, body, []);
 
-    await postReview(octokit, owner, repo, pullNumber, pr.headSha, body, mapped.comments);
-
-    core.setOutput('summary', result.summary);
-    core.info(
-      `Posted review with ${mapped.comments.length} inline comment(s) and ${mapped.unmapped.length} general finding(s).`
-    );
-
+    core.setOutput('summary', doc.solution || doc.background);
+    core.info('Posted review.');
     if (commentId) await reactToComment(octokit, owner, repo, commentId, '+1');
   } catch (err) {
     core.setFailed(`AI code review failed: ${(err as Error).message}`);

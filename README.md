@@ -75,8 +75,8 @@ Then add the **`ai-review`** label to a PR, or comment **`/ai-review`**.
   `auto-review` is on), fetches the changed files and their diffs through the REST API,
   and **never clones the repo**.
 - The diff is annotated with new-file line numbers so the model can cite accurate lines.
-- Output is posted as a single PR review: inline comments on the relevant lines plus a
-  summary table (critical / warning / suggestion / nit).
+- Output is posted as a single PR review: a structured document (background, proposed
+  solution, a file-change table, verification notes, and high-level recommendations).
 
 ---
 
@@ -158,10 +158,16 @@ A complete ready-to-paste branded workflow is in
 
 ## Review format
 
-- **Inline comments** on specific lines: severity badge, the issue, and a brief
-  *How to fix* note (guidance, not a full code rewrite).
-- **Summary review body**: counts by severity, an overview, and any general findings
-  that could not be mapped to a specific diff line.
+The review is posted as a single, structured document:
+
+- **Issue / Background** — what the change addresses and why.
+- **Proposed Solution** — assessment of the implementation approach.
+- **Summary of File Changes** — a per-file table (path, change type, description).
+- **Testing** — test changes present in the diff (shown only when relevant).
+- **Recommendations & Enhancements** — high-level suggestions only (Security / Edge Case /
+  Performance / Refactoring Tip). Trivial nits (missing comments/tests, style) are
+  intentionally excluded.
+- Closes with a small `_Automated review using AI Code Review._` watermark.
 - The review is always **non-blocking** (`COMMENT` event).
 
 ## Development

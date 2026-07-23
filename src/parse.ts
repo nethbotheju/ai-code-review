@@ -1,8 +1,6 @@
-import { Finding, ReviewResult, Severity } from './types';
+import { FileDescription, Recommendation, ReviewDocument } from './types';
 
-const VALID_SEVERITIES: Severity[] = ['critical', 'warning', 'suggestion', 'nit'];
-
-export function parseReview(raw: string): ReviewResult {
+export function parseReview(raw: string): ReviewDocument {
   const text = extractJson(raw);
   let parsed: unknown;
   try {
@@ -10,16 +8,15 @@ export function parseReview(raw: string): ReviewResult {
   } catch {
     parsed = JSON.parse(stripTrailingCommas(text));
   }
+  const obj = (parsed ?? {}) as Record<string, unknown>;
 
-  const obj = parsed as { summary?: unknown; findings?: unknown };
-  const summary = typeof obj?.summary === 'string' ? obj.summary.trim() : '';
-  const findings: Finding[] = Array.isArray(obj?.findings)
-    ? (obj.findings as unknown[])
-        .map(normalizeFinding)
-        .filter((f): f is Finding => f !== null)
-    : [];
-
-  return { summary, findings };
+  return {
+    background: asString(obj.background),
+    solution: asString(obj.solution),
+    files: asFileDescriptions(obj.files),
+    tests: asString(obj.tests),
+    recommendations: asRecommendations(obj.recommendations),
+  };
 }
 
 function extractJson(raw: string): string {
@@ -42,30 +39,34 @@ function stripTrailingCommas(text: string): string {
   return text.replace(/,(\s*[}\]])/g, '$1');
 }
 
-function normalizeFinding(value: unknown): Finding | null {
-  if (!value || typeof value !== 'object') return null;
-  const f = value as Record<string, unknown>;
-
-  const file = typeof f.file === 'string' ? f.file.trim() : '';
-  const comment = typeof f.comment === 'string' ? f.comment.trim() : '';
-  if (!file || !comment) return null;
-
-  const rawSeverity = typeof f.severity === 'string' ? f.severity.toLowerCase() : '';
-  const severity: Severity = VALID_SEVERITIES.includes(rawSeverity as Severity)
-    ? (rawSeverity as Severity)
-    : 'suggestion';
-
-  const line = toInt(f.line) ?? 0;
-  const suggestion =
-    typeof f.suggestion === 'string' && f.suggestion.trim() ? f.suggestion.trim() : undefined;
-
-  return { file, line, severity, comment, suggestion };
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
-function toInt(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    return Number.parseInt(value.trim(), 10);
-  }
-  return null;
+function asFileDescriptions(value: unknown): FileDescription[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const f = item as Record<string, unknown>;
+      const path = typeof f.path === 'string' ? f.path.trim() : '';
+      const description = typeof f.description === 'string' ? f.description.trim() : '';
+      if (!path) return null;
+      return { path, description };
+    })
+    .filter((x): x is FileDescription => x !== null);
+}
+
+function asRecommendations(value: unknown): Recommendation[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const r = item as Record<string, unknown>;
+      const note = typeof r.note === 'string' ? r.note.trim() : '';
+      if (!note) return null;
+      const category = typeof r.category === 'string' && r.category.trim() ? r.category.trim() : 'Suggestion';
+      return { category, note };
+    })
+    .filter((x): x is Recommendation => x !== null);
 }

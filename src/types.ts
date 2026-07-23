@@ -1,7 +1,5 @@
 export type ApiType = 'openai' | 'openai-compatible' | 'anthropic';
 
-export type Severity = 'critical' | 'warning' | 'suggestion' | 'nit';
-
 export interface ActionInputs {
   apiType: ApiType;
   apiKey: string;
@@ -36,20 +34,6 @@ export interface ChangedFile {
   additions: number;
   deletions: number;
   lines: AnnotatedLine[];
-  validNewLines: Set<number>;
-}
-
-export interface Finding {
-  file: string;
-  line: number;
-  severity: Severity;
-  comment: string;
-  suggestion?: string;
-}
-
-export interface ReviewResult {
-  summary: string;
-  findings: Finding[];
 }
 
 export interface ReviewComment {
@@ -57,4 +41,22 @@ export interface ReviewComment {
   line: number;
   side: 'RIGHT';
   body: string;
+}
+
+export interface FileDescription {
+  path: string;
+  description: string;
+}
+
+export interface Recommendation {
+  category: string;
+  note: string;
+}
+
+export interface ReviewDocument {
+  background: string;
+  solution: string;
+  files: FileDescription[];
+  tests: string;
+  recommendations: Recommendation[];
 }

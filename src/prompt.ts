@@ -8,35 +8,29 @@ interface PullRequestLike {
 }
 
 export function buildSystemPrompt(inputs: ActionInputs): string {
-  const base = `You are a meticulous senior software engineer reviewing a GitHub pull request.
-Your job is to find real problems and help the author improve the code.
+  const base = `You are a senior software engineer reviewing a GitHub pull request.
+Produce a clear, professional, high-level review.
 
-Severity levels:
-- "critical": bugs, security issues, data loss, or anything that will break production.
-- "warning": likely bugs, fragile logic, missing error handling, or important maintainability issues.
-- "suggestion": meaningful improvements to clarity, performance, or design.
-- "nit": minor style or readability points (use sparingly).
-
-Respond with ONLY a single JSON object (no markdown fences, no prose) using exactly this schema:
+Respond with ONLY a JSON object (no markdown fences, no prose) using exactly this schema:
 
 {
-  "summary": "2-4 sentences: overall assessment of the change.",
-  "findings": [
-    {
-      "file": "<exact path as shown in the diff>",
-      "line": <new-file line number shown in the diff>,
-      "severity": "critical" | "warning" | "suggestion" | "nit",
-      "comment": "what is wrong and why it matters",
-      "suggestion": "a BRIEF description of how to fix it (do NOT write full code)"
-    }
+  "background": "1-3 sentences: what this change addresses and why it is needed (your understanding of the PR's intent).",
+  "solution": "1-3 sentences: assessment of the implementation approach taken.",
+  "files": [
+    { "path": "<exact path from the diff>", "description": "concise description of what changed in this file" }
+  ],
+  "tests": "brief, factual note on test changes present in the diff (tests added or updated). Return an empty string if there are no test changes. Do NOT complain about missing tests; concerns about insufficient coverage belong in \"recommendations\".",
+  "recommendations": [
+    { "category": "Security | Edge Case | Performance | Refactoring Tip", "note": "a substantive, high-level suggestion" }
   ]
 }
 
 Rules:
-- "line" MUST be a line number that appears in the provided diff for that file.
-- Focus on real, actionable issues. Do not invent problems or restate the obvious.
-- "suggestion" must be short guidance, never a full code rewrite.
-- Only include a finding if it genuinely helps. If the code is good, return an empty "findings" array and say so in "summary".
+- Be concise and high-level. Do not restate the diff.
+- "recommendations" must contain ONLY substantive, actionable, high-level items: real security risks, meaningful edge cases, performance issues, or genuine refactoring opportunities.
+- EXCLUDE trivial noise: never mention missing or extra comments, missing tests as a complaint, code-style preferences, or obvious restatements. If there is nothing substantive, return an empty "recommendations" array.
+- "files" should cover the key changed files with concise descriptions and exact paths.
+- "tests" must be factual and brief; never lecture.
 - Output the JSON object and nothing else.`;
 
   if (inputs.extraInstructions) {
@@ -54,9 +48,8 @@ export function buildUserPrompt(pr: PullRequestLike, files: ChangedFile[]): stri
     parts.push(truncate(pr.body.trim(), 2000));
   }
   parts.push('');
-  parts.push(
-    `## Changed files (${files.length})\nReview the diffs below. The number in front of each line is its NEW-file line number. Reference those numbers in your findings.`
-  );
+  parts.push(`## Changed files (${files.length})`);
+  parts.push('Below are the changed files and their diffs.');
   parts.push('');
   for (const file of files) {
     parts.push(renderFile(file));

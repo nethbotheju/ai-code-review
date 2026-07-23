@@ -30399,17 +30399,13 @@ async function fetchChangedFiles(octokit, owner, repo, pullNumber, inputs) {
         addedLines = nextTotal;
         selected.push(file);
     }
-    const files = selected.map((f) => {
-        const { lines, validNewLines } = annotatePatch(f.patch);
-        return {
-            filename: f.filename,
-            status: f.status,
-            additions: f.additions,
-            deletions: f.deletions,
-            lines,
-            validNewLines,
-        };
-    });
+    const files = selected.map((f) => ({
+        filename: f.filename,
+        status: f.status,
+        additions: f.additions,
+        deletions: f.deletions,
+        lines: annotatePatch(f.patch),
+    }));
     core.info(`Found ${all.length} changed file(s); ${candidates.length} reviewable; reviewing ${files.length}.`);
     return {
         files,
@@ -30421,7 +30417,6 @@ async function fetchChangedFiles(octokit, owner, repo, pullNumber, inputs) {
 }
 function annotatePatch(patch) {
     const result = [];
-    const validNewLines = new Set();
     const raw = patch.split('\n');
     let currentNew = 0;
     let inHunk = false;
@@ -30437,7 +30432,6 @@ function annotatePatch(patch) {
             continue;
         if (line.startsWith('+')) {
             result.push({ type: 'add', newLine: currentNew, content: line.slice(1) });
-            validNewLines.add(currentNew);
             currentNew++;
         }
         else if (line.startsWith('-')) {
@@ -30449,11 +30443,10 @@ function annotatePatch(patch) {
         else {
             const content = line.startsWith(' ') ? line.slice(1) : line;
             result.push({ type: 'context', newLine: currentNew, content });
-            validNewLines.add(currentNew);
             currentNew++;
         }
     }
-    return { lines: result, validNewLines };
+    return result;
 }
 
 
@@ -30465,70 +30458,70 @@ function annotatePatch(patch) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.formatInlineComment = formatInlineComment;
-exports.formatSummary = formatSummary;
+exports.formatReview = formatReview;
 exports.formatNoChanges = formatNoChanges;
-const SEVERITY_META = {
-    critical: { icon: '🔴', label: 'Critical' },
-    warning: { icon: '🟠', label: 'Warning' },
-    suggestion: { icon: '🔵', label: 'Suggestion' },
-    nit: { icon: '⚪', label: 'Nit' },
+const CHANGE_TYPE = {
+    added: 'Added',
+    modified: 'Modified',
+    removed: 'Removed',
+    renamed: 'Renamed',
+    copied: 'Copied',
+    changed: 'Changed',
 };
-function formatInlineComment(f) {
-    const meta = SEVERITY_META[f.severity] ?? SEVERITY_META.suggestion;
-    const lines = [`**${meta.icon} ${meta.label}**`, '', f.comment];
-    if (f.suggestion) {
-        lines.push('', `**How to fix:** ${f.suggestion}`);
+function formatReview(doc, files) {
+    const out = [];
+    out.push('### Issue / Background', '');
+    out.push(doc.background.trim() || '_No background provided._', '');
+    out.push('### Proposed Solution', '');
+    out.push(doc.solution.trim() || '_No solution assessment provided._', '');
+    out.push('## Summary of File Changes', '');
+    out.push('| File Path | Change Type | Description |');
+    out.push('| :--- | :--- | :--- |');
+    const descriptions = new Map(doc.files.map((f) => [f.path, f.description]));
+    for (const f of files) {
+        const changeType = CHANGE_TYPE[f.status] ?? capitalize(f.status);
+        const description = descriptions.get(f.filename)?.trim() ||
+            `${f.additions} addition(s), ${f.deletions} deletion(s)`;
+        out.push(`| \`${f.filename}\` | ${changeType} | ${cell(description)} |`);
     }
-    return lines.join('\n');
-}
-function formatSummary(opts) {
-    const counts = countBySeverity(opts.findings);
-    const lines = ['## 🤖 AI Code Review', ''];
-    lines.push(`Reviewed **${opts.reviewedFiles}** of **${opts.totalFiles}** changed file(s) · **${opts.findings.length}** finding(s).`, '');
-    if (opts.truncated) {
-        lines.push(`> ⚠️ This review was limited to fit the model's context (${opts.truncatedReason}). Additional files were not reviewed.`, '');
+    out.push('');
+    const tests = inline(doc.tests);
+    if (tests) {
+        out.push('## Testing', '');
+        out.push(tests);
+        out.push('');
     }
-    lines.push('| Severity | Count |', '| --- | --- |');
-    for (const key of ['critical', 'warning', 'suggestion', 'nit']) {
-        lines.push(`| ${SEVERITY_META[key].icon} ${SEVERITY_META[key].label} | ${counts[key]} |`);
+    out.push('## Recommendations & Enhancements', '');
+    if (doc.recommendations.length === 0) {
+        out.push('_No high-level recommendations; the change looks solid._');
     }
-    lines.push('');
-    lines.push('### Overview', opts.summary.trim() || '_No summary provided._', '');
-    if (opts.unmapped.length > 0) {
-        lines.push('<details><summary>📌 General findings (not tied to a specific diff line)</summary>', '');
-        for (const f of opts.unmapped) {
-            const meta = SEVERITY_META[f.severity] ?? SEVERITY_META.suggestion;
-            lines.push(`**${meta.icon} ${meta.label} — \`${f.file}\`**`, f.comment);
-            if (f.suggestion)
-                lines.push(`_How to fix:_ ${f.suggestion}`);
-            lines.push('');
+    else {
+        for (const r of doc.recommendations) {
+            out.push(`- **[${r.category}]:** ${inline(r.note)}`);
         }
-        lines.push('</details>', '');
     }
-    lines.push('---', `_Automated review using \`${opts.model}\` via \`${opts.apiType}\`. Findings are recommendations, not blocking checks._`);
-    return lines.join('\n');
+    out.push('');
+    out.push('---', '_Automated review using AI Code Review._');
+    return out.join('\n');
 }
 function formatNoChanges() {
     return [
-        '## 🤖 AI Code Review',
+        '### Issue / Background',
         '',
         'No reviewable code changes were found (only excluded, generated, deleted, or binary files).',
         '',
-        '_Review skipped._',
+        '---',
+        '_Automated review using AI Code Review._',
     ].join('\n');
 }
-function countBySeverity(findings) {
-    const counts = {
-        critical: 0,
-        warning: 0,
-        suggestion: 0,
-        nit: 0,
-    };
-    for (const f of findings) {
-        counts[f.severity] += 1;
-    }
-    return counts;
+function cell(text) {
+    return text.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
+}
+function inline(text) {
+    return text.replace(/\r?\n/g, ' ').trim();
+}
+function capitalize(value) {
+    return value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Modified';
 }
 
 
@@ -30656,7 +30649,6 @@ const diff_1 = __nccwpck_require__(9952);
 const prompt_1 = __nccwpck_require__(705);
 const factory_1 = __nccwpck_require__(6025);
 const parse_1 = __nccwpck_require__(2828);
-const review_1 = __nccwpck_require__(7491);
 const format_1 = __nccwpck_require__(6264);
 const github_2 = __nccwpck_require__(9248);
 async function run() {
@@ -30688,23 +30680,12 @@ async function run() {
         core.info(`Requesting review from ${inputs.apiType}/${inputs.model} for ${fetchResult.files.length} file(s)...`);
         const provider = (0, factory_1.createProvider)(inputs);
         const raw = await provider.complete(systemPrompt, userPrompt);
-        core.info('Received model response; parsing findings...');
-        const result = (0, parse_1.parseReview)(raw);
-        const mapped = (0, review_1.mapFindings)(result.findings, fetchResult.files);
-        const body = (0, format_1.formatSummary)({
-            summary: result.summary,
-            findings: result.findings,
-            reviewedFiles: fetchResult.reviewedFiles,
-            totalFiles: fetchResult.totalFiles,
-            truncated: fetchResult.truncated,
-            truncatedReason: fetchResult.truncatedReason,
-            unmapped: mapped.unmapped,
-            model: inputs.model,
-            apiType: inputs.apiType,
-        });
-        await (0, github_2.postReview)(octokit, owner, repo, pullNumber, pr.headSha, body, mapped.comments);
-        core.setOutput('summary', result.summary);
-        core.info(`Posted review with ${mapped.comments.length} inline comment(s) and ${mapped.unmapped.length} general finding(s).`);
+        core.info('Received model response; parsing...');
+        const doc = (0, parse_1.parseReview)(raw);
+        const body = (0, format_1.formatReview)(doc, fetchResult.files);
+        await (0, github_2.postReview)(octokit, owner, repo, pullNumber, pr.headSha, body, []);
+        core.setOutput('summary', doc.solution || doc.background);
+        core.info('Posted review.');
         if (commentId)
             await (0, github_2.reactToComment)(octokit, owner, repo, commentId, '+1');
     }
@@ -30955,7 +30936,6 @@ exports.OpenAIProvider = OpenAIProvider;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.parseReview = parseReview;
-const VALID_SEVERITIES = ['critical', 'warning', 'suggestion', 'nit'];
 function parseReview(raw) {
     const text = extractJson(raw);
     let parsed;
@@ -30965,14 +30945,14 @@ function parseReview(raw) {
     catch {
         parsed = JSON.parse(stripTrailingCommas(text));
     }
-    const obj = parsed;
-    const summary = typeof obj?.summary === 'string' ? obj.summary.trim() : '';
-    const findings = Array.isArray(obj?.findings)
-        ? obj.findings
-            .map(normalizeFinding)
-            .filter((f) => f !== null)
-        : [];
-    return { summary, findings };
+    const obj = (parsed ?? {});
+    return {
+        background: asString(obj.background),
+        solution: asString(obj.solution),
+        files: asFileDescriptions(obj.files),
+        tests: asString(obj.tests),
+        recommendations: asRecommendations(obj.recommendations),
+    };
 }
 function extractJson(raw) {
     let text = raw.trim();
@@ -30990,29 +30970,40 @@ function extractJson(raw) {
 function stripTrailingCommas(text) {
     return text.replace(/,(\s*[}\]])/g, '$1');
 }
-function normalizeFinding(value) {
-    if (!value || typeof value !== 'object')
-        return null;
-    const f = value;
-    const file = typeof f.file === 'string' ? f.file.trim() : '';
-    const comment = typeof f.comment === 'string' ? f.comment.trim() : '';
-    if (!file || !comment)
-        return null;
-    const rawSeverity = typeof f.severity === 'string' ? f.severity.toLowerCase() : '';
-    const severity = VALID_SEVERITIES.includes(rawSeverity)
-        ? rawSeverity
-        : 'suggestion';
-    const line = toInt(f.line) ?? 0;
-    const suggestion = typeof f.suggestion === 'string' && f.suggestion.trim() ? f.suggestion.trim() : undefined;
-    return { file, line, severity, comment, suggestion };
+function asString(value) {
+    return typeof value === 'string' ? value.trim() : '';
 }
-function toInt(value) {
-    if (typeof value === 'number' && Number.isFinite(value))
-        return Math.trunc(value);
-    if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-        return Number.parseInt(value.trim(), 10);
-    }
-    return null;
+function asFileDescriptions(value) {
+    if (!Array.isArray(value))
+        return [];
+    return value
+        .map((item) => {
+        if (!item || typeof item !== 'object')
+            return null;
+        const f = item;
+        const path = typeof f.path === 'string' ? f.path.trim() : '';
+        const description = typeof f.description === 'string' ? f.description.trim() : '';
+        if (!path)
+            return null;
+        return { path, description };
+    })
+        .filter((x) => x !== null);
+}
+function asRecommendations(value) {
+    if (!Array.isArray(value))
+        return [];
+    return value
+        .map((item) => {
+        if (!item || typeof item !== 'object')
+            return null;
+        const r = item;
+        const note = typeof r.note === 'string' ? r.note.trim() : '';
+        if (!note)
+            return null;
+        const category = typeof r.category === 'string' && r.category.trim() ? r.category.trim() : 'Suggestion';
+        return { category, note };
+    })
+        .filter((x) => x !== null);
 }
 
 
@@ -31028,35 +31019,29 @@ exports.buildSystemPrompt = buildSystemPrompt;
 exports.buildUserPrompt = buildUserPrompt;
 const util_1 = __nccwpck_require__(4527);
 function buildSystemPrompt(inputs) {
-    const base = `You are a meticulous senior software engineer reviewing a GitHub pull request.
-Your job is to find real problems and help the author improve the code.
+    const base = `You are a senior software engineer reviewing a GitHub pull request.
+Produce a clear, professional, high-level review.
 
-Severity levels:
-- "critical": bugs, security issues, data loss, or anything that will break production.
-- "warning": likely bugs, fragile logic, missing error handling, or important maintainability issues.
-- "suggestion": meaningful improvements to clarity, performance, or design.
-- "nit": minor style or readability points (use sparingly).
-
-Respond with ONLY a single JSON object (no markdown fences, no prose) using exactly this schema:
+Respond with ONLY a JSON object (no markdown fences, no prose) using exactly this schema:
 
 {
-  "summary": "2-4 sentences: overall assessment of the change.",
-  "findings": [
-    {
-      "file": "<exact path as shown in the diff>",
-      "line": <new-file line number shown in the diff>,
-      "severity": "critical" | "warning" | "suggestion" | "nit",
-      "comment": "what is wrong and why it matters",
-      "suggestion": "a BRIEF description of how to fix it (do NOT write full code)"
-    }
+  "background": "1-3 sentences: what this change addresses and why it is needed (your understanding of the PR's intent).",
+  "solution": "1-3 sentences: assessment of the implementation approach taken.",
+  "files": [
+    { "path": "<exact path from the diff>", "description": "concise description of what changed in this file" }
+  ],
+  "tests": "brief, factual note on test changes present in the diff (tests added or updated). Return an empty string if there are no test changes. Do NOT complain about missing tests; concerns about insufficient coverage belong in \"recommendations\".",
+  "recommendations": [
+    { "category": "Security | Edge Case | Performance | Refactoring Tip", "note": "a substantive, high-level suggestion" }
   ]
 }
 
 Rules:
-- "line" MUST be a line number that appears in the provided diff for that file.
-- Focus on real, actionable issues. Do not invent problems or restate the obvious.
-- "suggestion" must be short guidance, never a full code rewrite.
-- Only include a finding if it genuinely helps. If the code is good, return an empty "findings" array and say so in "summary".
+- Be concise and high-level. Do not restate the diff.
+- "recommendations" must contain ONLY substantive, actionable, high-level items: real security risks, meaningful edge cases, performance issues, or genuine refactoring opportunities.
+- EXCLUDE trivial noise: never mention missing or extra comments, missing tests as a complaint, code-style preferences, or obvious restatements. If there is nothing substantive, return an empty "recommendations" array.
+- "files" should cover the key changed files with concise descriptions and exact paths.
+- "tests" must be factual and brief; never lecture.
 - Output the JSON object and nothing else.`;
     if (inputs.extraInstructions) {
         return `${base}\n\nAdditional review instructions from the project:\n${inputs.extraInstructions}`;
@@ -31072,7 +31057,8 @@ function buildUserPrompt(pr, files) {
         parts.push((0, util_1.truncate)(pr.body.trim(), 2000));
     }
     parts.push('');
-    parts.push(`## Changed files (${files.length})\nReview the diffs below. The number in front of each line is its NEW-file line number. Reference those numbers in your findings.`);
+    parts.push(`## Changed files (${files.length})`);
+    parts.push('Below are the changed files and their diffs.');
     parts.push('');
     for (const file of files) {
         parts.push(renderFile(file));
@@ -31100,79 +31086,6 @@ function renderFile(file) {
 }
 function pad(n) {
     return (n ?? '').toString().padStart(5, ' ');
-}
-
-
-/***/ }),
-
-/***/ 7491:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.mapFindings = mapFindings;
-const format_1 = __nccwpck_require__(6264);
-function mapFindings(findings, files) {
-    const byFile = new Map();
-    for (const f of files)
-        byFile.set(f.filename, f);
-    const comments = [];
-    const unmapped = [];
-    const placed = new Set();
-    for (const f of findings) {
-        const file = findFile(byFile, f.file);
-        if (!file) {
-            unmapped.push(f);
-            continue;
-        }
-        const line = snapToValidLine(f.line, file.validNewLines);
-        if (line == null) {
-            unmapped.push(f);
-            continue;
-        }
-        const key = `${file.filename}:${line}:${f.comment}`;
-        if (placed.has(key))
-            continue;
-        placed.add(key);
-        comments.push({
-            path: file.filename,
-            line,
-            side: 'RIGHT',
-            body: (0, format_1.formatInlineComment)(f),
-        });
-    }
-    return { comments, unmapped };
-}
-function findFile(byFile, name) {
-    const target = name.trim();
-    if (byFile.has(target))
-        return byFile.get(target);
-    const targetBase = target.split('/').pop();
-    for (const file of byFile.values()) {
-        const fileBase = file.filename.split('/').pop();
-        if (fileBase && targetBase && fileBase === targetBase)
-            return file;
-        if (file.filename.endsWith(target) || target.endsWith(file.filename))
-            return file;
-    }
-    return undefined;
-}
-function snapToValidLine(line, valid) {
-    if (valid.size === 0)
-        return null;
-    if (line > 0 && valid.has(line))
-        return line;
-    let best = null;
-    let bestDelta = Number.POSITIVE_INFINITY;
-    for (const candidate of valid) {
-        const delta = Math.abs(candidate - (line > 0 ? line : 0));
-        if (delta < bestDelta) {
-            bestDelta = delta;
-            best = candidate;
-        }
-    }
-    return best;
 }
 
 

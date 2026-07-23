@@ -104,17 +104,13 @@ export async function fetchChangedFiles(
     selected.push(file);
   }
 
-  const files: ChangedFile[] = selected.map((f) => {
-    const { lines, validNewLines } = annotatePatch(f.patch as string);
-    return {
-      filename: f.filename,
-      status: f.status,
-      additions: f.additions,
-      deletions: f.deletions,
-      lines,
-      validNewLines,
-    };
-  });
+  const files: ChangedFile[] = selected.map((f) => ({
+    filename: f.filename,
+    status: f.status,
+    additions: f.additions,
+    deletions: f.deletions,
+    lines: annotatePatch(f.patch as string),
+  }));
 
   core.info(
     `Found ${all.length} changed file(s); ${candidates.length} reviewable; reviewing ${files.length}.`
@@ -129,12 +125,8 @@ export async function fetchChangedFiles(
   };
 }
 
-export function annotatePatch(patch: string): {
-  lines: AnnotatedLine[];
-  validNewLines: Set<number>;
-} {
+export function annotatePatch(patch: string): AnnotatedLine[] {
   const result: AnnotatedLine[] = [];
-  const validNewLines = new Set<number>();
   const raw = patch.split('\n');
   let currentNew = 0;
   let inHunk = false;
@@ -152,7 +144,6 @@ export function annotatePatch(patch: string): {
 
     if (line.startsWith('+')) {
       result.push({ type: 'add', newLine: currentNew, content: line.slice(1) });
-      validNewLines.add(currentNew);
       currentNew++;
     } else if (line.startsWith('-')) {
       result.push({ type: 'delete', content: line.slice(1) });
@@ -161,10 +152,9 @@ export function annotatePatch(patch: string): {
     } else {
       const content = line.startsWith(' ') ? line.slice(1) : line;
       result.push({ type: 'context', newLine: currentNew, content });
-      validNewLines.add(currentNew);
       currentNew++;
     }
   }
 
-  return { lines: result, validNewLines };
+  return result;
 }
