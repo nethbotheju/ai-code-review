@@ -14,7 +14,6 @@ export function parseReview(raw: string): ReviewDocument {
     background: asString(obj.background),
     solution: asString(obj.solution),
     files: asFileDescriptions(obj.files),
-    tests: asString(obj.tests),
     recommendations: asRecommendations(obj.recommendations),
   };
 }

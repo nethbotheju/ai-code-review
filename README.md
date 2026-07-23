@@ -163,10 +163,8 @@ The review is posted as a single, structured document:
 - **Issue / Background** — what the change addresses and why.
 - **Proposed Solution** — assessment of the implementation approach.
 - **Summary of File Changes** — a per-file table (path, change type, description).
-- **Testing** — test changes present in the diff (shown only when relevant).
-- **Recommendations & Enhancements** — high-level suggestions only (Security / Edge Case /
-  Performance / Refactoring Tip). Trivial nits (missing comments/tests, style) are
-  intentionally excluded.
+- **Recommendations** — high-level suggestions only (Security / Edge Case / Performance /
+  Refactoring Tip). Trivial nits (missing comments/tests, style) are intentionally excluded.
 - Closes with a small `_Automated review using AI Code Review._` watermark.
 - The review is always **non-blocking** (`COMMENT` event).
 

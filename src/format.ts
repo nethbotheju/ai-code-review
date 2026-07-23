@@ -31,14 +31,7 @@ export function formatReview(doc: ReviewDocument, files: ChangedFile[]): string 
   }
   out.push('');
 
-  const tests = inline(doc.tests);
-  if (tests) {
-    out.push('## Testing', '');
-    out.push(tests);
-    out.push('');
-  }
-
-  out.push('## Recommendations & Enhancements', '');
+  out.push('## Recommendations', '');
   if (doc.recommendations.length === 0) {
     out.push('_No high-level recommendations; the change looks solid._');
   } else {

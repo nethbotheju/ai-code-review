@@ -57,6 +57,5 @@ export interface ReviewDocument {
   background: string;
   solution: string;
   files: FileDescription[];
-  tests: string;
   recommendations: Recommendation[];
 }
