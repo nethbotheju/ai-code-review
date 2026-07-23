@@ -78,6 +78,60 @@ Then add the **`ai-review`** label to a PR, or comment **`/ai-review`**.
 - Output is posted as a single PR review: inline comments on the relevant lines plus a
   summary table (critical / warning / suggestion / nit).
 
+---
+
+## Optional: post as a branded bot (custom name & avatar)
+
+By default the review is posted with the workflow's `GITHUB_TOKEN`, so it shows as
+`github-actions[bot]` with the GitHub logo — **no extra setup required**.
+
+For a custom name and logo (like CodeRabbit), pass a different token through the
+`github-token` input. The identity comes entirely from the token, so **no action code
+changes are needed**. Two options:
+
+### Option A — GitHub App (recommended for branding)
+
+1. Create a GitHub App: set a name + logo, grant **Pull requests: Read & write**,
+   **Contents: Read**, **Issues: Read & write**. Leave the webhook off and subscribe to
+   no events (the workflow still triggers the action; the App only provides identity).
+2. Install the App on the repo(s).
+3. Add secrets `APP_ID` and `APP_PRIVATE_KEY` (the full `.pem` file contents).
+4. Mint a token and pass it as `github-token`:
+
+```yaml
+    steps:
+      - id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - uses: nethbotheju/ai-code-review@v1
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          # ...your other inputs
+```
+
+Reviews post as `<your-app-slug>[bot]` with your logo.
+
+### Option B — bot user + PAT (simpler, one secret)
+
+Create a GitHub user whose avatar is your logo, generate a PAT, store it as
+`REVIEW_BOT_TOKEN`, and pass it as `github-token`:
+
+```yaml
+    - uses: nethbotheju/ai-code-review@v1
+      with:
+        github-token: ${{ secrets.REVIEW_BOT_TOKEN }}
+        # ...your other inputs
+```
+
+A complete ready-to-paste branded workflow is in
+[`examples/workflow-branded.yml`](./examples/workflow-branded.yml).
+
+> GitHub only renders a custom name/avatar for tokens that carry a custom identity
+> (an App or a PAT); the default `GITHUB_TOKEN` cannot be branded. This is a GitHub
+> limitation, not the action.
+
 ## Inputs
 
 | Input | Required | Default | Description |
@@ -125,6 +179,15 @@ that `dist/` is up to date on every PR.
 
 Tag a release and keep a moving major tag (`v1`) pointing at the latest commit on
 that major, so consumers can pin `@v1` while receiving patch updates.
+
+## Roadmap
+
+- **Reduce per-consumer setup for branded bots.** Today, branding via a GitHub App or
+  PAT requires each repo to add its own secrets. A hosted (webhook) mode would let
+  consumers click **Install** with zero per-repo secrets — the App would receive events
+  directly and run centrally. This is a larger, separate effort.
+- Retry on transient provider errors (e.g. HTTP 5xx).
+- Optional full-file context beyond the diff.
 
 ## License
 

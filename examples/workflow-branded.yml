@@ -1,17 +1,20 @@
-# Copy this into your project at .github/workflows/ai-code-review.yml
-# Only the API key is a secret — add a repository secret named AI_CODE_REVIEW_LLM_API_KEY.
-# Everything else (provider, model, base URL) is plain config you edit directly below.
+# Branded variant: posts the review as your own GitHub App (custom name + avatar)
+# instead of the default github-actions[bot].
 #
-# The review runs when:
-#   - someone adds the "ai-review" label to a PR, OR
-#   - someone comments "/ai-review" on a PR.
-# To ALSO review automatically on open / reopen / push, set `auto-review: 'true'`.
+# This is OPTIONAL. The default (examples/workflow.yml) needs no App and works as-is.
 #
-# Replace `your-org/ai-code-review` with the real org/repo of this action,
-# and pin it to a tag (e.g. @v1).
+# Why: GitHub only shows a custom name/logo for tokens that carry a custom identity
+# (an App or a PAT). The default GITHUB_TOKEN cannot be branded.
 #
-# Want the review to post as your own branded bot (custom name + avatar)?
-# See workflow-branded.yml (optional).
+# One-time App setup:
+#   1. Create a GitHub App: name + logo; permissions Pull requests: Read & write,
+#      Contents: Read, Issues: Read & write. Webhook OFF, subscribe to no events.
+#   2. Install the App on this repo.
+#   3. Add repository secrets APP_ID and APP_PRIVATE_KEY (full .pem contents).
+#
+# Alternative (simpler, one secret): skip the App and use a bot user + PAT —
+# store a PAT as REVIEW_BOT_TOKEN and pass `github-token: ${{ secrets.REVIEW_BOT_TOKEN }}`
+# directly (no create-github-app-token step needed).
 
 name: ai-code-review
 
@@ -21,14 +24,12 @@ on:
   issue_comment:
     types: [created]
 
-# Avoid duplicate runs when a user comments and labels in quick succession.
 concurrency:
   group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
   review:
-    # Only run when it is a PR and the trigger (label OR slash command) matches.
     if: |
       (github.event_name == 'pull_request' &&
         (github.event.action != 'labeled' || github.event.label.name == 'ai-review'))
@@ -42,9 +43,17 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: AI code review
+      - name: Get App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: AI code review (branded)
         uses: nethbotheju/ai-code-review@v1
         with:
+          github-token: ${{ steps.app-token.outputs.token }}
           api-type: openai            # openai | openai-compatible | anthropic
           model: gpt-4o               # your model
           # base-url: 'http://opencode.ai/zen/go/v1'   # set ONLY for openai-compatible
