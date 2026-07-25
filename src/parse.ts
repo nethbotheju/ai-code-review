@@ -2,12 +2,7 @@ import { FileDescription, Recommendation, ReviewDocument } from './types';
 
 export function parseReview(raw: string): ReviewDocument {
   const text = extractJson(raw);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    parsed = JSON.parse(stripTrailingCommas(text));
-  }
+  const parsed = parseLenient(text);
   const obj = (parsed ?? {}) as Record<string, unknown>;
 
   return {
@@ -36,6 +31,34 @@ function extractJson(raw: string): string {
 
 function stripTrailingCommas(text: string): string {
   return text.replace(/,(\s*[}\]])/g, '$1');
+}
+
+function stripComments(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+}
+
+function normalizeQuotes(text: string): string {
+  return text.replace(/"/g, '\\"').replace(/'/g, '"');
+}
+
+function parseLenient(text: string): unknown {
+  const cleaned = stripComments(stripTrailingCommas(text));
+  const candidates = [text, cleaned];
+  if (cleaned.includes("'")) {
+    candidates.push(normalizeQuotes(cleaned));
+  }
+  let lastError: unknown;
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  const preview = text.length > 400 ? `${text.slice(0, 400)}…` : text;
+  throw new Error(
+    `Could not parse model response as JSON (${(lastError as Error).message}). Model response was:\n${preview}`
+  );
 }
 
 function asString(value: unknown): string {

@@ -30898,6 +30898,7 @@ class OpenAIProvider {
             body: JSON.stringify({
                 model: this.options.model,
                 temperature: 0.2,
+                response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt },
@@ -30932,13 +30933,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.parseReview = parseReview;
 function parseReview(raw) {
     const text = extractJson(raw);
-    let parsed;
-    try {
-        parsed = JSON.parse(text);
-    }
-    catch {
-        parsed = JSON.parse(stripTrailingCommas(text));
-    }
+    const parsed = parseLenient(text);
     const obj = (parsed ?? {});
     return {
         background: asString(obj.background),
@@ -30962,6 +30957,30 @@ function extractJson(raw) {
 }
 function stripTrailingCommas(text) {
     return text.replace(/,(\s*[}\]])/g, '$1');
+}
+function stripComments(text) {
+    return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+}
+function normalizeQuotes(text) {
+    return text.replace(/"/g, '\\"').replace(/'/g, '"');
+}
+function parseLenient(text) {
+    const cleaned = stripComments(stripTrailingCommas(text));
+    const candidates = [text, cleaned];
+    if (cleaned.includes("'")) {
+        candidates.push(normalizeQuotes(cleaned));
+    }
+    let lastError;
+    for (const candidate of candidates) {
+        try {
+            return JSON.parse(candidate);
+        }
+        catch (err) {
+            lastError = err;
+        }
+    }
+    const preview = text.length > 400 ? `${text.slice(0, 400)}…` : text;
+    throw new Error(`Could not parse model response as JSON (${lastError.message}). Model response was:\n${preview}`);
 }
 function asString(value) {
     return typeof value === 'string' ? value.trim() : '';
