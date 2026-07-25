@@ -34,7 +34,6 @@ export class AnthropicProvider implements Provider {
       body: JSON.stringify({
         model: this.options.model,
         max_tokens: 4096,
-        temperature: 0.2,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),

@@ -30806,7 +30806,6 @@ class AnthropicProvider {
             body: JSON.stringify({
                 model: this.options.model,
                 max_tokens: 4096,
-                temperature: 0.2,
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userPrompt }],
             }),
@@ -30897,8 +30896,6 @@ class OpenAIProvider {
             },
             body: JSON.stringify({
                 model: this.options.model,
-                temperature: 0.2,
-                response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt },
@@ -31034,7 +31031,7 @@ function buildSystemPrompt(inputs) {
     const base = `You are a senior software engineer reviewing a GitHub pull request.
 Produce a clear, professional, high-level review.
 
-Respond with ONLY a JSON object (no markdown fences, no prose) using exactly this schema:
+Your ENTIRE response must be a single valid JSON object and nothing else — no markdown, no code fences, no commentary before or after. Respond with ONLY this JSON object, using exactly this schema:
 
 {
   "background": "1-3 sentences: what this change addresses and why it is needed (your understanding of the PR's intent).",

@@ -11,7 +11,7 @@ export function buildSystemPrompt(inputs: ActionInputs): string {
   const base = `You are a senior software engineer reviewing a GitHub pull request.
 Produce a clear, professional, high-level review.
 
-Respond with ONLY a JSON object (no markdown fences, no prose) using exactly this schema:
+Your ENTIRE response must be a single valid JSON object and nothing else — no markdown, no code fences, no commentary before or after. Respond with ONLY this JSON object, using exactly this schema:
 
 {
   "background": "1-3 sentences: what this change addresses and why it is needed (your understanding of the PR's intent).",
