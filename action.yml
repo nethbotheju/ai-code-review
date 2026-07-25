@@ -16,7 +16,7 @@ inputs:
     description: 'Base URL of the API. Required for openai-compatible. Optional override for openai/anthropic.'
     required: false
   model:
-    description: 'Model identifier to use for the review (e.g. gpt-4o, claude-3-5-sonnet-20241022).'
+    description: 'Model identifier to use for the review (e.g. gpt-4o, claude-sonnet-4-5).'
     required: true
 
   github-token:
@@ -58,6 +58,32 @@ inputs:
     description: 'Extra review guidance appended to the prompt (e.g. project conventions, style rules).'
     required: false
     default: ''
+
+  # Agent-mode inputs
+  review-mode:
+    description: 'Review mode: standard (single prompt) or agent (tool-enabled investigation loop).'
+    required: false
+    default: 'standard'
+  agent-max-steps:
+    description: 'Maximum number of LLM steps (tool-call rounds) when review-mode is agent.'
+    required: false
+    default: '8'
+  agent-max-context-bytes:
+    description: 'Maximum bytes of file content the agent may read via tools across all steps.'
+    required: false
+    default: '120000'
+  agent-tarball-max-mb:
+    description: 'Maximum tarball size in MB for the repo snapshot (agent mode). Larger repos degrade to standard mode.'
+    required: false
+    default: '200'
+  context-docs:
+    description: 'Comma/newline-separated list of markdown doc files to include from the repo root (e.g. AGENTS.md, CONTRIBUTING.md).'
+    required: false
+    default: ''
+  allow-agent-on-compatible:
+    description: 'Allow agent review-mode on openai-compatible endpoints (tool support depends on the backend).'
+    required: false
+    default: 'false'
 
 outputs:
   summary:

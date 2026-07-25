@@ -149,6 +149,12 @@ A complete ready-to-paste branded workflow is in
 | `exclude-patterns` | no | — | Extra glob excludes (comma/newline separated) |
 | `use-default-excludes` | no | `true` | Apply built-in excludes (lockfiles, minified, dist/build, etc.) |
 | `extra-instructions` | no | — | Extra guidance appended to the prompt |
+| `review-mode` | no | `standard` | Review mode: `standard` (single prompt) or `agent` (tool-enabled investigation loop) |
+| `agent-max-steps` | no | `8` | Max LLM steps (tool-call rounds) when `review-mode` is `agent` |
+| `agent-max-context-bytes` | no | `120000` | Max bytes of file content the agent may read via tools |
+| `agent-tarball-max-mb` | no | `200` | Max tarball size in MB for the repo snapshot (larger repos degrade to standard mode) |
+| `context-docs` | no | `AGENTS.md,.ai-review.md,CONTRIBUTING.md` | Markdown doc files to include from the repo root for project guidance |
+| `allow-agent-on-compatible` | no | `false` | Allow agent mode on `openai-compatible` endpoints |
 
 ## Outputs
 
@@ -167,6 +173,33 @@ The review is posted as a single, structured document:
   Refactoring Tip). Trivial nits (missing comments/tests, style) are intentionally excluded.
 - Closes with a small `_Automated review using AI Code Review._` watermark.
 - The review is always **non-blocking** (`COMMENT` event).
+
+## Agent mode (`review-mode: agent`)
+
+When `review-mode` is `agent`, the action downloads the full repo at the PR head
+as a tarball (one API call) and gives the model two tools to investigate the
+codebase before making recommendations:
+
+- **`read_file`** — read any file in the repo, with optional line ranges.
+- **`search_files`** — pattern/regex search across the repo.
+
+The model can call these tools in a loop (up to `agent-max-steps` rounds), verify
+whether a potential issue truly exists, and confirm that a fix hasn't already been
+implemented elsewhere before writing a recommendation. Budgets (`agent-max-context-bytes`)
+prevent unbounded token use.
+
+**Model recommendation:** Agent mode needs a capable model that can use tools
+effectively — Claude Sonnet (`claude-sonnet-4-5`) or GPT-4o class. Smaller/cheaper
+models may loop poorly or produce incorrect tool calls.
+
+**Security note:** Agent mode reads non-diff files from the repo to provide context.
+Files matching patterns like `**/.env*`, `**/secrets/**`, `*.pem`, `*.key` are
+automatically excluded. The repo is never uploaded — it stays on the runner and
+is deleted after the review completes.
+
+**Fallback:** If the repo tarball exceeds `agent-tarball-max-mb`, or if the provider
+does not support tool calling, the action automatically falls back to standard mode
+with a warning.
 
 ## Development
 
@@ -191,7 +224,8 @@ that major, so consumers can pin `@v1` while receiving patch updates.
   consumers click **Install** with zero per-repo secrets — the App would receive events
   directly and run centrally. This is a larger, separate effort.
 - Retry on transient provider errors (e.g. HTTP 5xx).
-- Optional full-file context beyond the diff.
+- `generateObject` for typed final output (replace fragile JSON parsing).
+- Search tool with MCP integration for richer codebase queries.
 
 ## License
 
