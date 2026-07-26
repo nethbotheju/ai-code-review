@@ -7,16 +7,25 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && ncc build src/index.ts -o dist --source-map --license licenses.txt",
-    "bundle": "ncc build src/index.ts -o dist --source-map --license licenses.txt"
+    "bundle": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "license": "MIT",
   "dependencies": {
     "@actions/core": "^1.10.1",
     "@actions/github": "^6.0.0",
-    "minimatch": "^9.0.5"
+    "@ai-sdk/anthropic": "^4.0.20",
+    "@ai-sdk/openai": "^4.0.20",
+    "ai": "^7.0.37",
+    "minimatch": "^9.0.5",
+    "tar": "^7.5.22",
+    "vitest": "^4.1.10",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
+    "@types/tar": "^6.1.13",
     "@vercel/ncc": "^0.38.1",
     "typescript": "^5.4.5"
   }

@@ -1,0 +1,36 @@
+name: ai-code-review (agent mode)
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: |
+      (github.event_name == 'pull_request' &&
+        (github.event.action != 'labeled' || github.event.label.name == 'ai-review'))
+      || (github.event_name == 'issue_comment' &&
+        startsWith(github.event.comment.body, '/ai-review') &&
+        github.event.issue.pull_request != null)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: nethbotheju/ai-code-review@v1
+        with:
+          api-type: anthropic             # Agent mode works best with Anthropic or OpenAI
+          model: claude-sonnet-4-5        # Use a capable model for agent mode
+          api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
+          review-mode: agent              # Enable agent mode (tool-enabled investigation)
+          agent-max-steps: 8              # Max tool-call rounds
+          agent-max-context-bytes: 120000 # Budget for file reads
+          context-docs: |                 # Project docs to include for context
+            AGENTS.md
+            CONTRIBUTING.md
+            docs/CONVENTIONS.md
