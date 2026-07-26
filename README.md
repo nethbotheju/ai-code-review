@@ -154,7 +154,10 @@ A complete ready-to-paste branded workflow is in
 | `agent-max-context-bytes` | no | `120000` | Max bytes of file content the agent may read via tools |
 | `agent-tarball-max-mb` | no | `200` | Max tarball size in MB for the repo snapshot (larger repos degrade to standard mode) |
 | `context-docs` | no | `AGENTS.md,.ai-review.md,CONTRIBUTING.md` | Markdown doc files to include from the repo root for project guidance |
-| `allow-agent-on-compatible` | no | `false` | Allow agent mode on `openai-compatible` endpoints |
+| `allow-agent-on-compatible` | no | `false` | Allow agent mode on `openai-compatible` endpoints (ignored when `agent-engine` is `pi`) |
+| `agent-engine` | no | `builtin` | Agent engine: `builtin` (built-in tool loop, zero install) or `pi` (spawn `@earendil-works/pi-coding-agent` headless; installs ~170MB on the runner) |
+| `pi-version` | no | `0.82.1` | Version of `@earendil-works/pi-coding-agent` to install when `agent-engine` is `pi` |
+| `pi-timeout-ms` | no | `600000` | Hard timeout (ms) for a `pi`-engine review run |
 
 ## Outputs
 
@@ -177,16 +180,28 @@ The review is posted as a single, structured document:
 ## Agent mode (`review-mode: agent`)
 
 When `review-mode` is `agent`, the action downloads the full repo at the PR head
-as a tarball (one API call) and gives the model two tools to investigate the
-codebase before making recommendations:
+as a tarball (one API call) and gives the model read-only tools to investigate
+the codebase before making recommendations. There are two engines:
 
-- **`read_file`** — read any file in the repo, with optional line ranges.
-- **`search_files`** — pattern/regex search across the repo.
+- **`agent-engine: builtin`** (default, zero install) — the built-in Vercel AI SDK
+  tool loop with two tools:
+  - **`read_file`** — read any file in the repo, with optional line ranges.
+  - **`search_files`** — pattern/regex search across the repo.
+  The loop runs up to `agent-max-steps` rounds; `agent-max-context-bytes` caps
+  total file bytes read.
 
-The model can call these tools in a loop (up to `agent-max-steps` rounds), verify
-whether a potential issue truly exists, and confirm that a fix hasn't already been
-implemented elsewhere before writing a recommendation. Budgets (`agent-max-context-bytes`)
-prevent unbounded token use.
+- **`agent-engine: pi`** — spawns [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi)
+  headless with read-only tools (`read`, `grep`, `find`, `ls`). This uses pi's
+  battle-tested loop (compaction, retries, parallel tool execution). It is
+  installed on the runner on first use (`npm install`, ~170MB) and cached under
+  `~/.cache/ai-code-review-pi`; cache that path across runs to avoid reinstalling.
+  The API key is passed via environment variable (never in argv), `openai-compatible`
+  endpoints are configured via an ephemeral `models.json`, and a hard `pi-timeout-ms`
+  guards against runaway loops (pi has no built-in step cap).
+
+In both engines the model verifies whether a potential issue truly exists and
+confirms that a fix hasn't already been implemented elsewhere before writing a
+recommendation.
 
 **Model recommendation:** Agent mode needs a capable model that can use tools
 effectively — Claude Sonnet (`claude-sonnet-4-5`) or GPT-4o class. Smaller/cheaper

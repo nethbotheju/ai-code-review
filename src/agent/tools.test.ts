@@ -24,6 +24,9 @@ function makeInputs(overrides?: Partial<ActionInputs>): ActionInputs {
     agentTarballMaxMb: 200,
     contextDocs: ['AGENTS.md'],
     allowAgentOnCompatible: false,
+    agentEngine: 'builtin',
+    piVersion: '0.82.1',
+    piTimeoutMs: 600000,
     ...overrides,
   };
 }

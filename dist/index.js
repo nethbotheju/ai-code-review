@@ -30941,6 +30941,531 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
+/***/ 1392:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.buildPiArgs = buildPiArgs;
+exports.buildPiEnv = buildPiEnv;
+const constants_1 = __nccwpck_require__(4624);
+const provider_1 = __nccwpck_require__(2872);
+/**
+ * Build the pi CLI args for a headless read-only review run.
+ * Assumes models.json (for compatible) has already been written to the config dir.
+ */
+function buildPiArgs(systemPrompt, userPrompt, inputs) {
+    return [
+        '-p', // print mode: process the prompt and exit
+        '--no-session', // ephemeral; never persist
+        '--mode', 'json', // JSONL event stream on stdout
+        '--offline', // no startup network (update checks / telemetry) — does not block the model call
+        '--thinking', 'off', // cost control
+        '--no-extensions',
+        '--no-skills',
+        '--no-prompt-templates',
+        '--no-context-files',
+        '--no-themes',
+        '--tools', 'read,grep,find,ls', // read-only investigation tools (no bash/edit/write)
+        '--system-prompt', systemPrompt,
+        '--provider', (0, provider_1.providerFor)(inputs),
+        '--model', inputs.model,
+        userPrompt,
+    ];
+}
+/** Build the child-process env. The API key is injected via env, never argv. */
+function buildPiEnv(inputs, configDir) {
+    const env = {
+        ...process.env,
+        PI_CODING_AGENT_DIR: configDir,
+    };
+    if (inputs.apiType === 'anthropic') {
+        env.ANTHROPIC_API_KEY = inputs.apiKey;
+    }
+    else if (inputs.apiType === 'openai') {
+        env.OPENAI_API_KEY = inputs.apiKey;
+    }
+    else {
+        env[constants_1.PI_CUSTOM_API_KEY_ENV] = inputs.apiKey;
+    }
+    return env;
+}
+
+
+/***/ }),
+
+/***/ 4624:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/** Shared constants for the pi engine. */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PI_CUSTOM_API_KEY_ENV = exports.PI_CUSTOM_PROVIDER = exports.PI_PACKAGE = void 0;
+/** npm package name, used to install pi on the runner at runtime. */
+exports.PI_PACKAGE = '@earendil-works/pi-coding-agent';
+/** Provider id registered in models.json for openai-compatible endpoints. */
+exports.PI_CUSTOM_PROVIDER = 'custom';
+/** Env var referenced by models.json ($ interpolation) for the compatible key. */
+exports.PI_CUSTOM_API_KEY_ENV = 'CUSTOM_API_KEY';
+
+
+/***/ }),
+
+/***/ 5761:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PI_CUSTOM_API_KEY_ENV = exports.PI_CUSTOM_PROVIDER = exports.PI_PACKAGE = exports.cliEntryPath = exports.installDir = exports.ensurePiInstalled = exports.messageText = exports.parsePiOutput = exports.buildPiEnv = exports.buildPiArgs = exports.buildModelsJson = exports.providerFor = void 0;
+exports.runPiReview = runPiReview;
+const fs = __importStar(__nccwpck_require__(3024));
+const path = __importStar(__nccwpck_require__(6760));
+const os = __importStar(__nccwpck_require__(8161));
+const core = __importStar(__nccwpck_require__(7484));
+const args_1 = __nccwpck_require__(1392);
+const provider_1 = __nccwpck_require__(2872);
+const install_1 = __nccwpck_require__(2550);
+const spawn_1 = __nccwpck_require__(7842);
+const output_1 = __nccwpck_require__(4416);
+/**
+ * Run the pi coding agent in headless print mode against the repo snapshot.
+ * Installs pi (cached), writes an ephemeral config dir (models.json for
+ * openai-compatible), spawns the CLI, and parses its JSONL event stream.
+ */
+async function runPiReview(systemPrompt, userPrompt, repoRoot, inputs) {
+    const cliEntry = await (0, install_1.ensurePiInstalled)(inputs.piVersion);
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-config-'));
+    try {
+        if (inputs.apiType === 'openai-compatible') {
+            fs.writeFileSync(path.join(configDir, 'models.json'), JSON.stringify((0, provider_1.buildModelsJson)(inputs), null, 2));
+        }
+        const args = (0, args_1.buildPiArgs)(systemPrompt, userPrompt, inputs);
+        const env = (0, args_1.buildPiEnv)(inputs, configDir);
+        core.info(`pi engine: provider=${(0, provider_1.providerFor)(inputs)} model=${inputs.model} ` +
+            `timeout=${inputs.piTimeoutMs}ms`);
+        const { events, stderr } = await (0, spawn_1.invokePi)(cliEntry, args, repoRoot.path, env, inputs.piTimeoutMs);
+        if (stderr.trim()) {
+            core.warning(`pi stderr (truncated):\n${stderr.trim().slice(0, 2000)}`);
+        }
+        return (0, output_1.parsePiOutput)(events);
+    }
+    finally {
+        try {
+            fs.rmSync(configDir, { recursive: true, force: true });
+        }
+        catch {
+            /* best-effort cleanup */
+        }
+    }
+}
+// Public surface re-exports
+var provider_2 = __nccwpck_require__(2872);
+Object.defineProperty(exports, "providerFor", ({ enumerable: true, get: function () { return provider_2.providerFor; } }));
+Object.defineProperty(exports, "buildModelsJson", ({ enumerable: true, get: function () { return provider_2.buildModelsJson; } }));
+var args_2 = __nccwpck_require__(1392);
+Object.defineProperty(exports, "buildPiArgs", ({ enumerable: true, get: function () { return args_2.buildPiArgs; } }));
+Object.defineProperty(exports, "buildPiEnv", ({ enumerable: true, get: function () { return args_2.buildPiEnv; } }));
+var output_2 = __nccwpck_require__(4416);
+Object.defineProperty(exports, "parsePiOutput", ({ enumerable: true, get: function () { return output_2.parsePiOutput; } }));
+Object.defineProperty(exports, "messageText", ({ enumerable: true, get: function () { return output_2.messageText; } }));
+var install_2 = __nccwpck_require__(2550);
+Object.defineProperty(exports, "ensurePiInstalled", ({ enumerable: true, get: function () { return install_2.ensurePiInstalled; } }));
+Object.defineProperty(exports, "installDir", ({ enumerable: true, get: function () { return install_2.installDir; } }));
+Object.defineProperty(exports, "cliEntryPath", ({ enumerable: true, get: function () { return install_2.cliEntryPath; } }));
+var constants_1 = __nccwpck_require__(4624);
+Object.defineProperty(exports, "PI_PACKAGE", ({ enumerable: true, get: function () { return constants_1.PI_PACKAGE; } }));
+Object.defineProperty(exports, "PI_CUSTOM_PROVIDER", ({ enumerable: true, get: function () { return constants_1.PI_CUSTOM_PROVIDER; } }));
+Object.defineProperty(exports, "PI_CUSTOM_API_KEY_ENV", ({ enumerable: true, get: function () { return constants_1.PI_CUSTOM_API_KEY_ENV; } }));
+
+
+/***/ }),
+
+/***/ 2550:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.installDir = installDir;
+exports.cliEntryPath = cliEntryPath;
+exports.ensurePiInstalled = ensurePiInstalled;
+exports.runNpm = runNpm;
+const fs = __importStar(__nccwpck_require__(3024));
+const path = __importStar(__nccwpck_require__(6760));
+const os = __importStar(__nccwpck_require__(8161));
+const node_child_process_1 = __nccwpck_require__(1421);
+const core = __importStar(__nccwpck_require__(7484));
+const constants_1 = __nccwpck_require__(4624);
+/** Directory where pi is installed. Cacheable by consumers across runs. */
+function installDir(version) {
+    return path.join(os.homedir(), '.cache', 'ai-code-review-pi', version);
+}
+/** Absolute path to the bundled CLI entry inside the install dir. */
+function cliEntryPath(version) {
+    return path.join(installDir(version), 'node_modules', constants_1.PI_PACKAGE, 'dist', 'cli.js');
+}
+/**
+ * Ensure pi is installed for the given version. Idempotent: skips if the CLI
+ * entry already exists (so consumers can cache `~/.cache/ai-code-review-pi`).
+ * Returns the absolute path to the bundled CLI entry point.
+ */
+async function ensurePiInstalled(version) {
+    const entry = cliEntryPath(version);
+    if (fs.existsSync(entry)) {
+        core.info(`pi ${version} found at ${installDir(version)} (cached).`);
+        return entry;
+    }
+    const dir = installDir(version);
+    fs.mkdirSync(dir, { recursive: true });
+    core.info(`Installing ${constants_1.PI_PACKAGE}@${version} into ${dir} ...`);
+    await runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', `${constants_1.PI_PACKAGE}@${version}`], dir);
+    if (!fs.existsSync(entry)) {
+        throw new Error(`npm reported success but the pi CLI entry was not found at ${entry}.`);
+    }
+    core.info('pi installed.');
+    return entry;
+}
+/** Run an npm command in `cwd`. `version` is validated upstream, so shell use is safe. */
+function runNpm(args, cwd) {
+    return new Promise((resolve, reject) => {
+        const child = (0, node_child_process_1.spawn)('npm', args, { cwd, shell: true, stdio: 'inherit' });
+        child.on('error', reject);
+        child.on('close', (code) => {
+            if (code !== 0)
+                reject(new Error(`npm ${args.join(' ')} exited with code ${code}`));
+            else
+                resolve();
+        });
+    });
+}
+
+
+/***/ }),
+
+/***/ 4416:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.messageText = messageText;
+exports.parsePiOutput = parsePiOutput;
+const core = __importStar(__nccwpck_require__(7484));
+/** Extract the concatenated text content of a pi message. */
+function messageText(m) {
+    const content = m.content;
+    if (typeof content === 'string')
+        return content.trim();
+    return (content ?? [])
+        .filter((c) => c.type === 'text')
+        .map((c) => c.text ?? '')
+        .join('')
+        .trim();
+}
+/** Collect assistant messages, preferring agent_end's full message list. */
+function collectAssistantMessages(events) {
+    const agentEnd = [...events]
+        .reverse()
+        .find((e) => e.type === 'agent_end' && Array.isArray(e.messages) && e.messages.length > 0);
+    if (agentEnd?.messages) {
+        return agentEnd.messages.filter((m) => m.role === 'assistant');
+    }
+    const messages = [];
+    for (const e of events) {
+        if ((e.type === 'message_end' || e.type === 'turn_end') && e.message?.role === 'assistant') {
+            messages.push(e.message);
+        }
+    }
+    return messages;
+}
+/** Parse the pi JSONL event stream into a ReviewResult. Throws if no text. */
+function parsePiOutput(events) {
+    const assistantMessages = collectAssistantMessages(events);
+    // Final review text = last assistant message that produced text.
+    let text = '';
+    for (let i = assistantMessages.length - 1; i >= 0; i--) {
+        const t = messageText(assistantMessages[i]);
+        if (t) {
+            text = t;
+            break;
+        }
+    }
+    if (!text) {
+        const lastError = assistantMessages[assistantMessages.length - 1]?.errorMessage;
+        if (lastError)
+            throw new Error(`pi review failed: ${lastError}`);
+        throw new Error('pi produced no review text.');
+    }
+    // Token totals: sum across non-error assistant turns.
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let totalTokens = 0;
+    let counted = false;
+    for (const m of assistantMessages) {
+        if (m.usage && m.stopReason !== 'error') {
+            inputTokens += m.usage.input ?? 0;
+            outputTokens += m.usage.output ?? 0;
+            totalTokens += m.usage.total ?? 0;
+            counted = true;
+        }
+    }
+    const turns = events.filter((e) => e.type === 'turn_end').length;
+    core.info(`pi review completed: ${turns} turn(s), ${assistantMessages.length} assistant message(s), ` +
+        `tokens in=${inputTokens} out=${outputTokens} tot=${totalTokens}`);
+    return {
+        text,
+        inputTokens: counted ? inputTokens : undefined,
+        outputTokens: counted ? outputTokens : undefined,
+        totalTokens: counted ? totalTokens : undefined,
+        steps: turns,
+    };
+}
+
+
+/***/ }),
+
+/***/ 2872:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.providerFor = providerFor;
+exports.buildModelsJson = buildModelsJson;
+const constants_1 = __nccwpck_require__(4624);
+/** Map the action's api-type to a pi provider id. */
+function providerFor(inputs) {
+    switch (inputs.apiType) {
+        case 'anthropic':
+            return 'anthropic';
+        case 'openai':
+            return 'openai';
+        case 'openai-compatible':
+            return constants_1.PI_CUSTOM_PROVIDER;
+        default: {
+            const _exhaustive = inputs.apiType;
+            throw new Error(`Unsupported api-type: ${_exhaustive}`);
+        }
+    }
+}
+/**
+ * Build the models.json content for an openai-compatible endpoint. The key is
+ * referenced via env interpolation ($CUSTOM_API_KEY) so it never
+ * appears in argv or on disk in plaintext beyond the process env.
+ */
+function buildModelsJson(inputs) {
+    if (inputs.apiType !== 'openai-compatible') {
+        throw new Error('buildModelsJson is only for openai-compatible.');
+    }
+    return {
+        providers: {
+            [constants_1.PI_CUSTOM_PROVIDER]: {
+                name: 'AI Review Compatible',
+                baseUrl: inputs.baseUrl,
+                api: 'openai-completions',
+                apiKey: `$${constants_1.PI_CUSTOM_API_KEY_ENV}`,
+                // Maximise compatibility with arbitrary OpenAI-compatible servers:
+                // send the system prompt as a `system` message and skip reasoning knobs.
+                compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+                models: [{ id: inputs.model }],
+            },
+        },
+    };
+}
+
+
+/***/ }),
+
+/***/ 7842:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.invokePi = invokePi;
+const node_child_process_1 = __nccwpck_require__(1421);
+/**
+ * Spawn the pi CLI, stream its JSONL stdout into parsed events, and resolve on
+ * completion. Enforces a hard timeout (SIGTERM then SIGKILL). Rejects if the
+ * process produces no events and exits non-zero, or if it times out.
+ */
+function invokePi(cliEntry, args, cwd, env, timeoutMs) {
+    return new Promise((resolve, reject) => {
+        const events = [];
+        let stderr = '';
+        let stdoutBuf = '';
+        let timedOut = false;
+        const child = (0, node_child_process_1.spawn)(process.execPath, [cliEntry, ...args], {
+            cwd,
+            env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        const timer = setTimeout(() => {
+            timedOut = true;
+            child.kill('SIGTERM');
+            setTimeout(() => {
+                try {
+                    child.kill('SIGKILL');
+                }
+                catch {
+                    /* already dead */
+                }
+            }, 5000);
+        }, timeoutMs);
+        child.stdout?.setEncoding('utf-8');
+        child.stdout?.on('data', (chunk) => {
+            stdoutBuf += chunk;
+            let nl;
+            while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
+                const line = stdoutBuf.slice(0, nl).trim();
+                stdoutBuf = stdoutBuf.slice(nl + 1);
+                if (!line.startsWith('{'))
+                    continue;
+                try {
+                    events.push(JSON.parse(line));
+                }
+                catch {
+                    /* skip non-JSON lines */
+                }
+            }
+        });
+        child.stderr?.setEncoding('utf-8');
+        child.stderr?.on('data', (chunk) => {
+            stderr += chunk;
+        });
+        child.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+        });
+        child.on('close', (code) => {
+            clearTimeout(timer);
+            const trailing = stdoutBuf.trim();
+            if (trailing.startsWith('{')) {
+                try {
+                    events.push(JSON.parse(trailing));
+                }
+                catch {
+                    /* skip */
+                }
+            }
+            if (timedOut) {
+                reject(new Error(`pi review timed out after ${timeoutMs}ms.`));
+                return;
+            }
+            if (code !== 0 && events.length === 0) {
+                reject(new Error(`pi exited with code ${code} and produced no output.\nstderr:\n${stderr.slice(0, 2000)}`));
+                return;
+            }
+            resolve({ events, stderr });
+        });
+    });
+}
+
+
+/***/ }),
+
 /***/ 1730:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -31168,11 +31693,8 @@ const tools_1 = __nccwpck_require__(5386);
  * The model is given tools (read_file, search_files) backed by a local repo
  * snapshot. `generateText` automatically loops: model calls tools → results
  * are fed back → model responds → repeats until `stopWhen` fires.
- *
- * For Anthropic the system prompt is sent as a cached system message so that
- * all steps after the first re-read it at cache-hit pricing.
  */
-async function runAgentReview(model, systemPrompt, userMessage, repoRoot, inputs) {
+async function runAgentReview(model, instructions, userMessage, repoRoot, inputs) {
     const budget = {
         bytesUsed: 0,
         filesRead: new Set(),
@@ -31181,30 +31703,15 @@ async function runAgentReview(model, systemPrompt, userMessage, repoRoot, inputs
     };
     const readFileTool = (0, tools_1.createReadFileTool)(repoRoot.path, budget, inputs);
     const searchFilesTool = (0, tools_1.createSearchFilesTool)(repoRoot.path, budget, inputs);
-    // Anthropic: cache the system prompt via a system message with cacheControl
-    // so that all subsequent steps re-read it at ~10% of the price.
-    const isAnthropic = inputs.apiType === 'anthropic';
-    const genOpts = {
+    core.info(`Agent mode: max ${inputs.agentMaxSteps} tool-call rounds, budget ${budget.maxBytes} bytes`);
+    const result = await (0, ai_1.generateText)({
         model,
+        instructions,
+        messages: [{ role: 'user', content: userMessage }],
         tools: { read_file: readFileTool, search_files: searchFilesTool },
         stopWhen: (0, ai_1.isStepCount)(inputs.agentMaxSteps),
-        maxOutputTokens: 8192,
         maxRetries: 1,
-    };
-    if (isAnthropic) {
-        genOpts.messages = [
-            { role: 'system', content: systemPrompt, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } },
-            { role: 'user', content: userMessage },
-        ];
-        genOpts.allowSystemInMessages = true;
-    }
-    else {
-        genOpts.instructions = systemPrompt;
-        genOpts.messages = [{ role: 'user', content: userMessage }];
-    }
-    core.info(`Agent mode: max ${inputs.agentMaxSteps} tool-call rounds, budget ${budget.maxBytes} bytes` +
-        (isAnthropic ? ', Anthropic prompt caching ON' : ''));
-    const result = await (0, ai_1.generateText)(genOpts);
+    });
     const text = result.text ?? '';
     const usage = result.usage;
     const steps = result.steps?.length ?? 0;
@@ -31212,9 +31719,6 @@ async function runAgentReview(model, systemPrompt, userMessage, repoRoot, inputs
     core.info(`Agent completed: ${steps} step(s), ${toolCalls.length} tool call(s), ` +
         `files read: ${budget.filesRead.size}, context bytes used: ${budget.bytesUsed}` +
         (usage ? `, tokens in=${usage.inputTokens} out=${usage.outputTokens} tot=${usage.totalTokens}` : ''));
-    if (usage?.inputTokenDetails?.cacheReadTokens != null) {
-        core.info(`Cache read tokens: ${usage.inputTokenDetails.cacheReadTokens}`);
-    }
     return {
         text,
         inputTokens: usage?.inputTokens,
@@ -31274,7 +31778,6 @@ const ai_1 = __nccwpck_require__(2793);
 const zod_1 = __nccwpck_require__(924);
 const repo_snapshot_1 = __nccwpck_require__(1730);
 const util_1 = __nccwpck_require__(1125);
-/** Never expose these to the model (secrets, keys, etc.). */
 const SECRETS_DENYLIST = [
     '**/.env*',
     '**/secrets/**',
@@ -31542,6 +32045,10 @@ exports.getInputs = getInputs;
 const core = __importStar(__nccwpck_require__(7484));
 const VALID_API_TYPES = ['openai', 'openai-compatible', 'anthropic'];
 const VALID_REVIEW_MODES = ['standard', 'agent'];
+const VALID_AGENT_ENGINES = ['builtin', 'pi'];
+const DEFAULT_PI_VERSION = '0.82.1';
+// Injection-safe version spec (semver, prerelease, dist-tag). No spaces/shell metachars.
+const VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._+\-]*$/;
 function parseList(value) {
     return value
         .split(/[\n,]/)
@@ -31578,6 +32085,16 @@ function getInputs() {
     const agentTarballMaxMb = Number.parseInt(core.getInput('agent-tarball-max-mb').trim() || '200', 10);
     const contextDocs = parseList(core.getInput('context-docs'));
     const allowAgentOnCompatible = core.getBooleanInput('allow-agent-on-compatible');
+    const agentEngineRaw = core.getInput('agent-engine').trim().toLowerCase() || 'builtin';
+    if (!VALID_AGENT_ENGINES.includes(agentEngineRaw)) {
+        throw new Error(`Invalid agent-engine '${agentEngineRaw}'. Must be one of: ${VALID_AGENT_ENGINES.join(', ')}`);
+    }
+    const agentEngine = agentEngineRaw;
+    const piVersion = core.getInput('pi-version').trim() || DEFAULT_PI_VERSION;
+    if (!VERSION_PATTERN.test(piVersion)) {
+        throw new Error(`Invalid pi-version '${piVersion}'. Must be a plain version or dist-tag (e.g. 0.82.1, latest).`);
+    }
+    const piTimeoutMs = Number.parseInt(core.getInput('pi-timeout-ms').trim() || '600000', 10);
     return {
         apiType,
         apiKey,
@@ -31598,6 +32115,9 @@ function getInputs() {
         agentTarballMaxMb,
         contextDocs: contextDocs.length > 0 ? contextDocs : ['AGENTS.md', '.ai-review.md', 'CONTRIBUTING.md'],
         allowAgentOnCompatible,
+        agentEngine,
+        piVersion,
+        piTimeoutMs,
     };
 }
 
@@ -32058,6 +32578,7 @@ const format_1 = __nccwpck_require__(1817);
 const run_1 = __nccwpck_require__(8457);
 const models_1 = __nccwpck_require__(8289);
 const runner_1 = __nccwpck_require__(8139);
+const pi_1 = __nccwpck_require__(5761);
 const repo_snapshot_1 = __nccwpck_require__(1730);
 async function run() {
     let repoRoot;
@@ -32111,8 +32632,11 @@ async function run() {
         const systemPrompt = (0, prompt_1.buildSystemPrompt)(promptInputs);
         const userPrompt = (0, prompt_1.buildUserPrompt)(pr, fetchResult.files, { docs: contextDocs, tree });
         // Run review
+        const usePiEngine = useAgent && inputs.agentEngine === 'pi';
         const reviewResult = useAgent && repoRoot
-            ? await (0, runner_1.runAgentReview)(model, systemPrompt, userPrompt, repoRoot, inputs)
+            ? (usePiEngine
+                ? await (0, pi_1.runPiReview)(systemPrompt, userPrompt, repoRoot, inputs)
+                : await (0, runner_1.runAgentReview)(model, systemPrompt, userPrompt, repoRoot, inputs))
             : await (0, run_1.runStandardReview)(model, systemPrompt, userPrompt);
         core.info(`Review done. tokens in=${reviewResult.inputTokens} out=${reviewResult.outputTokens} tot=${reviewResult.totalTokens} steps=${reviewResult.steps}`);
         // Parse, format, post
@@ -32141,7 +32665,11 @@ async function run() {
 function resolveEffectiveMode(inputs) {
     if (inputs.reviewMode === 'standard')
         return 'standard';
-    if (inputs.apiType === 'openai-compatible' && !inputs.allowAgentOnCompatible) {
+    // The pi engine has first-class openai-compatible support via models.json,
+    // so it bypasses the compatibility gate that the builtin tool loop is subject to.
+    if (inputs.apiType === 'openai-compatible' &&
+        inputs.agentEngine !== 'pi' &&
+        !inputs.allowAgentOnCompatible) {
         core.warning('Agent mode requested but api-type is openai-compatible (tool support varies). ' +
             'Set allow-agent-on-compatible=true to override. Falling back to standard mode.');
         return 'standard';
@@ -32162,23 +32690,23 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createModel = createModel;
 const openai_1 = __nccwpck_require__(3436);
 const anthropic_1 = __nccwpck_require__(9930);
-function buildProviderOpts(inputs) {
-    const opts = { apiKey: inputs.apiKey };
-    if (inputs.baseUrl)
-        opts.baseURL = inputs.baseUrl;
-    return opts;
-}
 function createModel(inputs) {
     switch (inputs.apiType) {
-        case 'openai':
-            return (0, openai_1.createOpenAI)(buildProviderOpts(inputs))(inputs.model);
-        case 'openai-compatible':
+        case 'openai': {
+            const factory = (0, openai_1.createOpenAI)({ apiKey: inputs.apiKey });
+            return factory(inputs.model);
+        }
+        case 'openai-compatible': {
             if (!inputs.baseUrl) {
                 throw new Error("'base-url' is required when api-type is 'openai-compatible'.");
             }
-            return (0, openai_1.createOpenAI)(buildProviderOpts(inputs))(inputs.model);
-        case 'anthropic':
-            return (0, anthropic_1.createAnthropic)(buildProviderOpts(inputs))(inputs.model);
+            const factory = (0, openai_1.createOpenAI)({ apiKey: inputs.apiKey, baseURL: inputs.baseUrl });
+            return factory(inputs.model);
+        }
+        case 'anthropic': {
+            const factory = (0, anthropic_1.createAnthropic)({ apiKey: inputs.apiKey });
+            return factory(inputs.model);
+        }
         default: {
             const _exhaustive = inputs.apiType;
             throw new Error(`Unsupported api-type: ${_exhaustive}`);
@@ -32387,13 +32915,7 @@ Rules:
 - Output the JSON object and nothing else.`;
     const extras = [];
     if (isAgent) {
-        extras.push(`IMPORTANT — AGENT MODE:
-- You have access to the tools \`read_file\` and \`search_files\` to inspect the repository.
-- **Before asserting any problem**, verify it by reading the relevant files. If you suspect a fix already exists (e.g. in middleware, utility functions, or another part of the codebase), use the tools to confirm.
-- Only make a recommendation if you have verified the issue exists in the code you read.
-- If you need more context, use the tools — do not guess.
-- The repository layout, project guidance, and project documentation are provided in the prompt.
-- Your final response must still be ONLY the JSON review object above — no additional text.`);
+        extras.push(agentModeAddendum(inputs.agentEngine));
     }
     if (inputs.extraInstructions) {
         extras.push(`Additional review instructions from the project:\n${inputs.extraInstructions}`);
@@ -32401,6 +32923,18 @@ Rules:
     if (extras.length === 0)
         return base;
     return `${base}\n\n${extras.join('\n\n')}`;
+}
+function agentModeAddendum(engine) {
+    const tools = engine === 'pi'
+        ? 'You have read-only tools to inspect the repository: `read` (read a file), `grep` (search file contents), `find` (find files by name), and `ls` (list a directory).'
+        : 'You have access to the tools `read_file` and `search_files` to inspect the repository.';
+    return `IMPORTANT — AGENT MODE:
+- ${tools}
+- **Before asserting any problem**, verify it by reading the relevant files. If you suspect a fix already exists (e.g. in middleware, utility functions, or another part of the codebase), use the tools to confirm.
+- Only make a recommendation if you have verified the issue exists in the code you read.
+- If you need more context, use the tools — do not guess.
+- The repository layout, project guidance, and project documentation are provided in the prompt.
+- Your final response must still be ONLY the JSON review object above — no additional text.`;
 }
 function buildUserPrompt(pr, files, ctx) {
     const parts = [];
@@ -32693,6 +33227,14 @@ module.exports = require("net");
 
 "use strict";
 module.exports = require("node:assert");
+
+/***/ }),
+
+/***/ 1421:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:child_process");
 
 /***/ }),
 

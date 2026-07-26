@@ -2,6 +2,7 @@
 
 export type ApiType = 'openai' | 'openai-compatible' | 'anthropic';
 export type ReviewMode = 'standard' | 'agent';
+export type AgentEngine = 'builtin' | 'pi';
 
 export interface ActionInputs {
   apiType: ApiType;
@@ -24,6 +25,10 @@ export interface ActionInputs {
   agentTarballMaxMb: number;
   contextDocs: string[];
   allowAgentOnCompatible: boolean;
+  // Pi engine (agent mode only)
+  agentEngine: AgentEngine;
+  piVersion: string;
+  piTimeoutMs: number;
 }
 
 export interface RepoRoot {

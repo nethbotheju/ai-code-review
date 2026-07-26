@@ -11,6 +11,7 @@ import { formatNoChanges, formatReview } from './review/format';
 import { runStandardReview } from './review/run';
 import { createModel } from './llm/models';
 import { runAgentReview } from './agent/runner';
+import { runPiReview } from './agent/pi';
 import { prepareRepoSnapshot, buildRepoTree, cleanupRepoSnapshot, RepoTooLargeError } from './agent/repo-snapshot';
 import type { ActionInputs, RepoRoot } from './config/types';
 
@@ -74,8 +75,11 @@ async function run(): Promise<void> {
     const userPrompt = buildUserPrompt(pr, fetchResult.files, { docs: contextDocs, tree });
 
     // Run review
+    const usePiEngine = useAgent && inputs.agentEngine === 'pi';
     const reviewResult = useAgent && repoRoot
-      ? await runAgentReview(model, systemPrompt, userPrompt, repoRoot, inputs)
+      ? (usePiEngine
+          ? await runPiReview(systemPrompt, userPrompt, repoRoot, inputs)
+          : await runAgentReview(model, systemPrompt, userPrompt, repoRoot, inputs))
       : await runStandardReview(model, systemPrompt, userPrompt);
 
     core.info(
@@ -105,7 +109,13 @@ async function run(): Promise<void> {
 
 function resolveEffectiveMode(inputs: ActionInputs): 'standard' | 'agent' {
   if (inputs.reviewMode === 'standard') return 'standard';
-  if (inputs.apiType === 'openai-compatible' && !inputs.allowAgentOnCompatible) {
+  // The pi engine has first-class openai-compatible support via models.json,
+  // so it bypasses the compatibility gate that the builtin tool loop is subject to.
+  if (
+    inputs.apiType === 'openai-compatible' &&
+    inputs.agentEngine !== 'pi' &&
+    !inputs.allowAgentOnCompatible
+  ) {
     core.warning(
       'Agent mode requested but api-type is openai-compatible (tool support varies). ' +
         'Set allow-agent-on-compatible=true to override. Falling back to standard mode.',

@@ -1,4 +1,5 @@
 import type { ActionInputs } from '../config/types';
+import type { AgentEngine } from '../config/types';
 import type { ChangedFile } from '../shared/types';
 import { truncate } from '../shared/util';
 
@@ -37,13 +38,7 @@ Rules:
   const extras: string[] = [];
 
   if (isAgent) {
-    extras.push(`IMPORTANT — AGENT MODE:
-- You have access to the tools \`read_file\` and \`search_files\` to inspect the repository.
-- **Before asserting any problem**, verify it by reading the relevant files. If you suspect a fix already exists (e.g. in middleware, utility functions, or another part of the codebase), use the tools to confirm.
-- Only make a recommendation if you have verified the issue exists in the code you read.
-- If you need more context, use the tools — do not guess.
-- The repository layout, project guidance, and project documentation are provided in the prompt.
-- Your final response must still be ONLY the JSON review object above — no additional text.`);
+    extras.push(agentModeAddendum(inputs.agentEngine));
   }
 
   if (inputs.extraInstructions) {
@@ -52,6 +47,20 @@ Rules:
 
   if (extras.length === 0) return base;
   return `${base}\n\n${extras.join('\n\n')}`;
+}
+
+function agentModeAddendum(engine: AgentEngine): string {
+  const tools =
+    engine === 'pi'
+      ? 'You have read-only tools to inspect the repository: `read` (read a file), `grep` (search file contents), `find` (find files by name), and `ls` (list a directory).'
+      : 'You have access to the tools `read_file` and `search_files` to inspect the repository.';
+  return `IMPORTANT — AGENT MODE:
+- ${tools}
+- **Before asserting any problem**, verify it by reading the relevant files. If you suspect a fix already exists (e.g. in middleware, utility functions, or another part of the codebase), use the tools to confirm.
+- Only make a recommendation if you have verified the issue exists in the code you read.
+- If you need more context, use the tools — do not guess.
+- The repository layout, project guidance, and project documentation are provided in the prompt.
+- Your final response must still be ONLY the JSON review object above — no additional text.`;
 }
 
 export interface PromptContext {

@@ -81,9 +81,21 @@ inputs:
     required: false
     default: ''
   allow-agent-on-compatible:
-    description: 'Allow agent review-mode on openai-compatible endpoints (tool support depends on the backend).'
+    description: 'Allow agent review-mode on openai-compatible endpoints (tool support depends on the backend). Ignored when agent-engine is pi (pi has first-class openai-compatible support via models.json).'
     required: false
     default: 'false'
+  agent-engine:
+    description: 'Agent engine used when review-mode is agent. "builtin" = the built-in generateText tool loop (default, zero install). "pi" = spawn @earendil-works/pi-coding-agent headless with read-only tools (installs ~170MB on the runner, cacheable).'
+    required: false
+    default: 'builtin'
+  pi-version:
+    description: 'Version of @earendil-works/pi-coding-agent to install when agent-engine is pi (e.g. 0.82.1, latest).'
+    required: false
+    default: '0.82.1'
+  pi-timeout-ms:
+    description: 'Hard timeout in milliseconds for a pi-engine review run. Guards against runaway loops since pi has no built-in step cap.'
+    required: false
+    default: '600000'
 
 outputs:
   summary:
