@@ -2,7 +2,6 @@
 
 export type ApiType = 'openai' | 'openai-compatible' | 'anthropic';
 export type ReviewMode = 'standard' | 'agent';
-export type AgentEngine = 'builtin' | 'pi';
 
 export interface ActionInputs {
   apiType: ApiType;
@@ -20,13 +19,9 @@ export interface ActionInputs {
   extraInstructions?: string;
   // Agent mode
   reviewMode: ReviewMode;
-  agentMaxSteps: number;
-  agentMaxContextBytes: number;
   agentTarballMaxMb: number;
   contextDocs: string[];
-  allowAgentOnCompatible: boolean;
   // Pi engine (agent mode only)
-  agentEngine: AgentEngine;
   piVersion: string;
   piTimeoutMs: number;
 }
@@ -36,11 +31,4 @@ export interface RepoRoot {
   path: string;
   /** Temp working directory to remove on cleanup. */
   workDir: string;
-}
-
-export interface Budget {
-  bytesUsed: number;
-  filesRead: Set<string>;
-  maxBytes: number;
-  exhausted: boolean;
 }

@@ -20,8 +20,7 @@
     "ai": "^7.0.37",
     "minimatch": "^9.0.5",
     "tar": "^7.5.22",
-    "vitest": "^4.1.10",
-    "zod": "^4.4.3"
+    "vitest": "^4.1.10"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",

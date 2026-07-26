@@ -6,7 +6,7 @@ AI-powered pull request code review GitHub Action. Users bring their own LLM key
 
 Two review modes:
 - **standard** — single-pass LLM call with the diff + PR description
-- **agent** — multi-step tool-enabled loop with `read_file` and `search_files` tools backed by a local repo snapshot
+- **agent** — spawns `@earendil-works/pi-coding-agent` headless with read-only tools (`read`, `grep`, `find`, `ls`) backed by a local repo snapshot
 
 ## Setup Commands
 
@@ -29,7 +29,7 @@ Two review modes:
 
 - Run all tests: `npm test`
 - Tests are co-located with source files (`src/**/*.test.ts`)
-- No e2e tests — unit tests cover: path containment, tree building, tool execution, prompts, mock LLM interaction
+- No e2e tests — unit tests cover: path containment, tree building, pi arg/env/models.json generation, JSONL parsing, prompts, mock LLM interaction
 - The `.github/workflows/self-test.yml` runs the action against itself on PRs (dogfooding)
 - When changing prompt logic, update the corresponding `prompt.test.ts`
 
@@ -50,7 +50,7 @@ src/
   index.ts                   # lightweight orchestrator
   config/
     inputs.ts                # action input parsing
-    types.ts                 # ActionInputs, ApiType, ReviewMode, RepoRoot, Budget
+    types.ts                 # ActionInputs, ApiType, ReviewMode, RepoRoot
   github/
     trigger.ts               # event/trigger resolution (PR label, comment, auto)
     pull-request.ts          # fetch PR + changed files + annotate patch diff
@@ -59,9 +59,16 @@ src/
   llm/
     models.ts                # createModel factory (OpenAI, OpenAI-compatible, Anthropic)
   agent/
-    tools.ts                 # read_file + search_files tools (minimatch-based excludes)
-    runner.ts                # runAgentReview — generateText with tools + step loop
     repo-snapshot.ts         # tarball download + extraction + tree builder + safeResolve
+    pi/                      # pi engine — spawn @earendil-works/pi-coding-agent headless
+      index.ts               # runPiReview orchestrator + public re-exports
+      constants.ts           # PI_PACKAGE, PI_CUSTOM_PROVIDER, PI_CUSTOM_API_KEY_ENV
+      types.ts               # PiEvent / PiMessage (JSONL event shapes)
+      provider.ts            # providerFor + buildModelsJson (openai-compatible → models.json)
+      install.ts             # ensurePiInstalled + runNpm (cached npm install)
+      args.ts                # buildPiArgs + buildPiEnv (CLI args + env, key via env)
+      spawn.ts               # invokePi (subprocess + JSONL streaming + timeout)
+      output.ts              # parsePiOutput + messageText (events → ReviewResult)
   review/
     run.ts                   # runStandardReview — single-turn generateText
     prompt.ts                # buildSystemPrompt + buildUserPrompt (both modes)
@@ -76,23 +83,21 @@ src/
 
 | Package | Purpose |
 |---|---|
-| `ai` + `@ai-sdk/openai` + `@ai-sdk/anthropic` | LLM provider abstraction (generateText + tools) |
+| `ai` + `@ai-sdk/openai` + `@ai-sdk/anthropic` | LLM provider abstraction (generateText for standard mode) |
 | `@actions/core` + `@actions/github` | GitHub Actions runtime + octokit client |
 | `minimatch` | Glob matching for file exclusion |
 | `tar` | Tarball extraction for repo snapshot (agent mode) |
-| `zod` | Tool input schema validation |
 | `vitest` | Test runner |
 
 ## Agent Mode Details
 
 - Agent mode downloads the full repo as a tarball via octokit (`github/contents.ts`)
-- Extracts to a temp dir and provides `read_file` + `search_files` tools
-- Budget guards: `agent-max-context-bytes` (default 120KB) caps total file reads
-- Per-call caps: 50KB per `read_file`, 30 results per `search_files` (hardcoded in `agent/tools.ts`)
-- The step loop runs up to `agent-max-steps` (default 8) LLM calls — `isStepCount()` controls this
-- If the step limit fires while the model is still calling tools (not finalizing), the action errors with a parse failure
+- Extracts to a temp dir and spawns `@earendil-works/pi-coding-agent` headless against it
+- pi runs with read-only tools (`read`, `grep`, `find`, `ls`) — no shell, no write, no network exfiltration
+- The API key is injected via environment variable (never argv); `openai-compatible` endpoints are configured via an ephemeral `models.json` (`agent/pi/provider.ts`)
+- pi is installed on first use into `~/.cache/ai-code-review-pi/<version>` (cacheable); `pi-version` controls the version, `pi-timeout-ms` is the hard kill timeout (pi has no built-in step cap)
+- pi emits a JSONL event stream (`--mode json`) which `agent/pi/output.ts` parses into a `ReviewResult`
 - Tarball too large → auto-degrades to standard mode
-- `openai-compatible` requires explicit `allow-agent-on-compatible: true` to use agent mode
 
 ## Build and Release
 
@@ -106,4 +111,4 @@ src/
 - Test files import `../config/types` and `../shared/types` separately — ActionInputs are in config, domain types in shared.
 - The `buildProviderOpts` helper in `llm/models.ts` conditionally includes `baseURL` only when provided — do NOT pass it unconditionally for `openai`/`anthropic` types (SDK auto-injects the default).
 - `dist/` MUST be committed — GitHub Actions runs the compiled bundle, not TypeScript source.
-- When testing the agent loop with `MockLanguageModelV4`, the SDK does NOT auto-execute tools from mock responses — tool execution integration is tested separately in `agent/tools.test.ts`.
+- The pi engine is NOT bundled — it's installed at runtime via `npm install` on the runner (`agent/pi/install.ts`). The `dist/index.js` bundle stays small (~4MB); pi's ~170MB of deps live in the install cache dir.
