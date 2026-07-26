@@ -1,0 +1,66 @@
+name: ai-code-review (pi engine)
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: |
+      (github.event_name == 'pull_request' &&
+        (github.event.action != 'labeled' || github.event.label.name == 'ai-review'))
+      || (github.event_name == 'issue_comment' &&
+        startsWith(github.event.comment.body, '/ai-review') &&
+        github.event.issue.pull_request != null)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # The pi engine installs @earendil-works/pi-coding-agent (~170MB) on the runner
+      # on first run. Cache the install dir to skip reinstalling across runs:
+      - name: Cache pi install
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ai-code-review-pi
+          key: pi-${{ vars.AI_REVIEW_PI_VERSION || '0.82.1' }}
+
+      - uses: nethbotheju/ai-code-review@v1
+        with:
+          # ── Provider ──────────────────────────────────────────────
+          # Pick ONE of these three provider blocks:
+
+          # Option A — Anthropic (native)
+          api-type: anthropic
+          model: claude-sonnet-4-5
+          api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
+
+          # Option B — OpenAI (native)
+          # api-type: openai
+          # model: gpt-4o
+          # api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
+
+          # Option C — OpenAI-compatible (custom endpoint, e.g. OpenRouter, Together, vLLM)
+          # The pi engine auto-generates a models.json for this — no extra config needed.
+          # api-type: openai-compatible
+          # base-url: 'https://openrouter.ai/api/v1'
+          # model: anthropic/claude-sonnet-4-5
+          # api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
+
+          # ── Pi engine ─────────────────────────────────────────────
+          review-mode: agent              # pi engine only applies in agent mode
+          agent-engine: pi                # builtin (default) | pi
+          pi-version: '0.82.1'            # @earendil-works/pi-coding-agent version to install
+          pi-timeout-ms: '600000'         # hard timeout (10 min); pi has no step cap
+
+          # ── Optional ──────────────────────────────────────────────
+          context-docs: |                 # project docs to include for context
+            AGENTS.md
+            CONTRIBUTING.md
+          extra-instructions: |
+            Focus on security and edge cases. Ignore minor style nits.

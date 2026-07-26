@@ -201,7 +201,9 @@ the codebase before making recommendations. There are two engines:
 
 In both engines the model verifies whether a potential issue truly exists and
 confirms that a fix hasn't already been implemented elsewhere before writing a
-recommendation.
+recommendation. See [`examples/workflow-agent.yml`](./examples/workflow-agent.yml)
+(builtin engine) and [`examples/workflow-pi.yml`](./examples/workflow-pi.yml)
+(pi engine).
 
 **Model recommendation:** Agent mode needs a capable model that can use tools
 effectively — Claude Sonnet (`claude-sonnet-4-5`) or GPT-4o class. Smaller/cheaper
