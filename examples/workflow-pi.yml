@@ -21,6 +21,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      actions: write             # needed for actions/cache to save the pi install
     steps:
       # The pi engine installs @earendil-works/pi-coding-agent (~170MB) on the runner
       # on first run. Cache the install dir to skip reinstalling across runs:

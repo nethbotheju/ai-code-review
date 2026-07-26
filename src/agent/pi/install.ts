@@ -43,10 +43,10 @@ export async function ensurePiInstalled(version: string): Promise<string> {
   return entry;
 }
 
-/** Run an npm command in `cwd`. `version` is validated upstream, so shell use is safe. */
+/** Run an npm command in `cwd`. Version is validated upstream; npm resolves via PATH on the Linux runner. */
 export function runNpm(args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npm', args, { cwd, shell: true, stdio: 'inherit' });
+    const child = spawn('npm', args, { cwd, stdio: 'inherit' });
     child.on('error', reject);
     child.on('close', (code) => {
       if (code !== 0) reject(new Error(`npm ${args.join(' ')} exited with code ${code}`));
