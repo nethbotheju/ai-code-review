@@ -104,9 +104,43 @@ src/
 ## Build and Release
 
 - Build: `npm run build` → outputs `dist/index.js` (single-file bundle)
-- Release: tag a commit (`git tag v1.0.x`) and push. Maintain a moving major tag (`v1`).
 - The action is consumed by other projects via `uses: nethbotheju/ai-code-review@v1`
 - Consumers configure it in their `.github/workflows/` with their own LLM API key
+
+Every release uses **two tags** that must point at the same commit:
+
+- A specific **version tag** (e.g. `v1.3.0`) — immutable record of that release.
+- A moving **major tag** (`v1`) — always tracks the latest release on the current major. Consumers pin `@v1` to auto-follow releases within the major.
+
+### 1. Create and push the version tag
+
+```bash
+# Create the version tag on the current commit (HEAD)
+git tag v1.3.0
+
+# Push that single tag to the remote
+git push origin v1.3.0
+```
+
+### 2. Move the major `v1` tag to the latest commit and push
+
+```bash
+# Move the existing v1 tag onto HEAD (was already tagged, so -f is required locally)
+git tag -f v1
+
+# Force-push the moved tag. Moving an existing tag is a non-fast-forward update,
+# so the remote rejects it without --force.
+git push origin v1 --force
+```
+
+### Force-push blocked by the remote?
+
+Some orgs disable force-pushing tags. Fall back to delete + recreate:
+
+```bash
+git push origin :refs/tags/v1   # delete v1 on the remote
+git push origin v1              # push it fresh
+```
 
 ## Common Gotchas
 
