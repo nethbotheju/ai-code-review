@@ -30,17 +30,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      actions: write          # lets actions/cache save the agent install
     steps:
-      # Agent mode installs the tooling on first run; cache the install dir
-      # so it is reused across runs (pi versions live side-by-side, so a
-      # static key never needs bumping when pi-version changes).
-      - name: Cache pi agent install
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ai-code-review-pi
-          key: ai-code-review-pi
-
       - uses: nethbotheju/ai-code-review@v1
         with:
           api-type: openai            # openai | openai-compatible | anthropic

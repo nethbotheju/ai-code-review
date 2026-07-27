@@ -75,7 +75,7 @@ src/
         constants.ts         # PI_PACKAGE, PI_CUSTOM_PROVIDER, PI_CUSTOM_API_KEY_ENV
         types.ts             # PiEvent / PiMessage (JSONL event shapes)
         provider.ts          # providerFor + buildModelsJson (openai-compatible → models.json)
-        install.ts           # ensurePiInstalled + runNpm (cached npm install)
+        install.ts           # ensurePiInstalled + runNpm
         args.ts              # buildPiArgs + buildPiEnv (CLI args + env, key via env)
         spawn.ts             # invokePi (subprocess + JSONL streaming + timeout)
         output.ts            # parsePiOutput + messageText (events → ReviewResult)
@@ -97,7 +97,7 @@ src/
 - Extracts to a temp dir and spawns `@earendil-works/pi-coding-agent` headless against it
 - pi runs with read-only tools (`read`, `grep`, `find`, `ls`) — no shell, no write, no network exfiltration
 - The API key is injected via environment variable (never argv); `openai-compatible` endpoints are configured via an ephemeral `models.json` (`agent/pi/provider.ts`)
-- pi is installed on first use into `~/.cache/ai-code-review-pi/<version>` (cacheable); `pi-version` controls the version, `pi-timeout-ms` is the hard kill timeout (pi has no built-in step cap)
+- pi is installed on each run into `~/.cache/ai-code-review-pi/<version>` (`npm install`, a few seconds); `pi-version` controls the version, `pi-timeout-ms` is the hard kill timeout (pi has no built-in step cap)
 - pi emits a JSONL event stream (`--mode json`) which `agent/pi/output.ts` parses into a `ReviewResult`
 - Tarball too large → auto-degrades to standard mode
 
@@ -147,4 +147,4 @@ git push origin v1              # push it fresh
 - Test files import `../config/types` and `../shared/types` separately — ActionInputs are in config, domain types in shared.
 - The `buildProviderOpts` helper in `llm/models.ts` conditionally includes `baseURL` only when provided — do NOT pass it unconditionally for `openai`/`anthropic` types (SDK auto-injects the default).
 - `dist/` MUST be committed — GitHub Actions runs the compiled bundle, not TypeScript source.
-- The pi engine is NOT bundled — it's installed at runtime via `npm install` on the runner (`agent/pi/install.ts`). The `dist/index.js` bundle stays small (~4MB); pi's ~170MB of deps live in the install cache dir.
+- The pi engine is NOT bundled — it's installed at runtime via `npm install` on the runner (`agent/pi/install.ts`). The `dist/index.js` bundle stays small (~4MB); pi's ~170MB of deps live in the install dir.
