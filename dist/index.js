@@ -31177,12 +31177,14 @@ async function fetchChangedFiles(octokit, owner, repo, pullNumber, inputs) {
  */
 async function downloadTarball(octokit, owner, repo, ref) {
     const { data, headers } = await octokit.rest.repos.downloadTarballArchive({ owner, repo, ref });
-    if (!Buffer.isBuffer(data)) {
-        throw new Error(`Expected Buffer from downloadTarballArchive, got ${data?.constructor?.name ?? typeof data}.`);
+    if (!data) {
+        throw new Error('Empty response from downloadTarballArchive.');
     }
+    // Older octokit returns Buffer; v6 (native fetch) returns ArrayBuffer. Normalize.
+    const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
     const clHeader = headers['content-length'];
     const contentLengthMb = clHeader ? Number(clHeader) / (1024 * 1024) : null;
-    return { buffer: data, contentLengthMb };
+    return { buffer, contentLengthMb };
 }
 /**
  * Fetch one or more text files (e.g. project docs) from the repo at a ref.

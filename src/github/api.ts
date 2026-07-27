@@ -108,16 +108,16 @@ export async function downloadTarball(
 ): Promise<TarballResult> {
   const { data, headers } = await octokit.rest.repos.downloadTarballArchive({ owner, repo, ref });
 
-  if (!Buffer.isBuffer(data)) {
-    throw new Error(
-      `Expected Buffer from downloadTarballArchive, got ${data?.constructor?.name ?? typeof data}.`,
-    );
+  if (!data) {
+    throw new Error('Empty response from downloadTarballArchive.');
   }
+  // Older octokit returns Buffer; v6 (native fetch) returns ArrayBuffer. Normalize.
+  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
 
   const clHeader = (headers as Record<string, string | undefined>)['content-length'];
   const contentLengthMb = clHeader ? Number(clHeader) / (1024 * 1024) : null;
 
-  return { buffer: data, contentLengthMb };
+  return { buffer, contentLengthMb };
 }
 
 /**
