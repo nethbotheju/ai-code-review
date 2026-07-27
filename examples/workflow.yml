@@ -1,17 +1,10 @@
-# Copy this into your project at .github/workflows/ai-code-review.yml
-# Only the API key is a secret — add a repository secret named AI_CODE_REVIEW_LLM_API_KEY.
-# Everything else (provider, model, base URL) is plain config you edit directly below.
+# AI code review — standard review (single-pass over the diff).
+# Copy into your repo at .github/workflows/ai-code-review.yml and pin the action to @v1.
 #
-# The review runs when:
-#   - someone adds the "ai-review" label to a PR, OR
-#   - someone comments "/ai-review" on a PR.
-# To ALSO review automatically on open / reopen / push, set `auto-review: 'true'`.
+# Triggers: add the "ai-review" label to a PR, or comment "/ai-review".
+# Set auto-review: 'true' to also review on open / reopen / push.
 #
-# Replace `your-org/ai-code-review` with the real org/repo of this action,
-# and pin it to a tag (e.g. @v1).
-#
-# Want the review to post as your own branded bot (custom name + avatar)?
-# See workflow-branded.yml (optional).
+# Required secret: AI_CODE_REVIEW_LLM_API_KEY (your provider API key).
 
 name: ai-code-review
 
@@ -21,33 +14,27 @@ on:
   issue_comment:
     types: [created]
 
-# Avoid duplicate runs when a user comments and labels in quick succession.
 concurrency:
   group: ai-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
   review:
-    # Only run when it is a PR and the trigger (label OR slash command) matches.
     if: |
       (github.event_name == 'pull_request' &&
         (github.event.action != 'labeled' || github.event.label.name == 'ai-review'))
       || (github.event_name == 'issue_comment' &&
         startsWith(github.event.comment.body, '/ai-review') &&
         github.event.issue.pull_request != null)
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
-
     steps:
-      - name: AI code review
-        uses: nethbotheju/ai-code-review@v1
+      - uses: nethbotheju/ai-code-review@v1
         with:
           api-type: openai            # openai | openai-compatible | anthropic
-          model: gpt-4o               # your model
-          # base-url: 'http://opencode.ai/zen/go/v1'   # set ONLY for openai-compatible
+          model: gpt-4o
           api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
-          # auto-review: 'true'      # uncomment to review on open/reopen/push automatically
-          # extra-instructions: 'Follow the project's naming conventions...'
+          # auto-review: 'true'         # review on open/reopen/push automatically
+          # extra-instructions: '...'   # extra guidance appended to the prompt

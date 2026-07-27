@@ -31666,9 +31666,12 @@ function parsePiOutput(events) {
     let counted = false;
     for (const m of assistantMessages) {
         if (m.usage && m.stopReason !== 'error') {
-            inputTokens += m.usage.input ?? 0;
-            outputTokens += m.usage.output ?? 0;
-            totalTokens += m.usage.total ?? 0;
+            const inT = m.usage.input ?? 0;
+            const outT = m.usage.output ?? 0;
+            inputTokens += inT;
+            outputTokens += outT;
+            // Some providers (e.g. Anthropic, DeepSeek) omit usage.total; derive it.
+            totalTokens += m.usage.total ?? (inT + outT);
             counted = true;
         }
     }

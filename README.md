@@ -53,7 +53,7 @@ jobs:
         with:
           api-type: openai            # openai | openai-compatible | anthropic
           model: gpt-4o               # your model
-          # base-url: 'http://opencode.ai/zen/go/v1'   # set ONLY for openai-compatible
+          # base-url: 'https://opencode.ai/zen/go/v1'   # set ONLY for openai-compatible
           api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
           # auto-review: 'true'           # review on open/reopen/push automatically
           # extra-instructions: '...'
@@ -186,12 +186,11 @@ under `~/.cache/ai-code-review-pi`; cache that path across runs to avoid
 reinstalling. The API key is passed via environment variable (never in argv),
 `openai-compatible` endpoints are configured via an ephemeral `models.json`, and
 a hard `pi-timeout-ms` guards against runaway loops (pi has no built-in step
-cap). See [`examples/workflow-pi.yml`](./examples/workflow-pi.yml)
+cap). See [`examples/workflow-agent.yml`](./examples/workflow-agent.yml)
 for a complete example.
 
 The model verifies whether a potential issue truly exists and confirms that a
 fix hasn't already been implemented elsewhere before writing a recommendation.
-(pi engine).
 
 **Model recommendation:** Agent mode needs a capable model that can use tools
 effectively — Claude Sonnet (`claude-sonnet-4-5`) or GPT-4o class. Smaller/cheaper

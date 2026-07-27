@@ -1,17 +1,10 @@
-# AI code review — branded bot (posts the review with a custom name & avatar).
+# AI code review — agent review (investigates the repo with read-only tools before reviewing).
 # Copy into your repo at .github/workflows/ai-code-review.yml and pin the action to @v1.
 #
 # Triggers: add the "ai-review" label to a PR, or comment "/ai-review".
 # Set auto-review: 'true' to also review on open / reopen / push.
 #
-# Required secrets:
-#   AI_CODE_REVIEW_LLM_API_KEY — your provider API key.
-#   APP_ID, APP_PRIVATE_KEY     — a GitHub App (with your name + logo) installed on this
-#                                 repo, granted Pull requests: Read & write, Contents: Read.
-#                                 The App only provides identity; the workflow triggers the action.
-#
-# Simpler alternative (one secret, no App): store a PAT as REVIEW_BOT_TOKEN and pass
-# `github-token: ${{ secrets.REVIEW_BOT_TOKEN }}` directly — no token step needed.
+# Required secret: AI_CODE_REVIEW_LLM_API_KEY (your provider API key).
 
 name: ai-code-review
 
@@ -37,19 +30,24 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      actions: write          # lets actions/cache save the agent install
     steps:
-      - name: Get App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
+      # Agent mode installs the tooling on first run; cache the install dir
+      # so it is reused across runs (pi versions live side-by-side, so a
+      # static key never needs bumping when pi-version changes).
+      - name: Cache pi agent install
+        uses: actions/cache@v5
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          path: ~/.cache/ai-code-review-pi
+          key: ai-code-review-pi
 
       - uses: nethbotheju/ai-code-review@v1
         with:
-          github-token: ${{ steps.app-token.outputs.token }}
           api-type: openai            # openai | openai-compatible | anthropic
           model: gpt-4o
           api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
+          review-mode: agent          # investigate the repo with tools before reviewing
+          # pi-version: '0.82.1'         # override the bundled @earendil-works/pi-coding-agent version
+          # pi-timeout-ms: '600000'      # hard timeout for an agent run (ms)
           # auto-review: 'true'
           # extra-instructions: '...'
