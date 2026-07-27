@@ -62,6 +62,23 @@ describe('parsePiOutput', () => {
     expect(result.steps).toBe(2);
   });
 
+  it('derives total tokens from input+output when usage.total is absent', () => {
+    const events = [
+      ev('agent_end', {
+        messages: [
+          {
+            role: 'assistant',
+            content: [{ type: 'text', text: REVIEW_JSON }],
+            usage: { input: 100, output: 40 },
+            stopReason: 'end_turn',
+          },
+        ],
+      }),
+    ];
+    const result = parsePiOutput(events);
+    expect(result.totalTokens).toBe(140);
+  });
+
   it('ignores error-typed assistant messages when summing usage', () => {
     const events = [
       ev('agent_end', {
