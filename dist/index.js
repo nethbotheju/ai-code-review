@@ -31423,8 +31423,10 @@ async function run() {
         // Build prompts
         const tree = useAgent && repoRoot ? (0, snapshot_1.buildRepoTree)(repoRoot.path, inputs) : undefined;
         const promptInputs = useAgent ? inputs : { ...inputs, reviewMode: 'standard' };
-        const systemPrompt = (0, prompt_1.buildSystemPrompt)(promptInputs);
-        const userPrompt = (0, prompt_1.buildUserPrompt)(pr, fetchResult.files, { docs: contextDocs, tree });
+        const systemPrompt = useAgent
+            ? (0, prompt_1.buildAgentSystemPrompt)(promptInputs)
+            : (0, prompt_1.buildSystemPrompt)(promptInputs);
+        const userPrompt = (0, prompt_1.buildUserPrompt)(pr, fetchResult.files, { docs: contextDocs, tree }, useAgent);
         // Run review
         const reviewResult = useAgent && repoRoot
             ? await (0, runner_2.runAgentReview)(systemPrompt, userPrompt, repoRoot, inputs)
@@ -32384,10 +32386,10 @@ function annotatePatch(patch) {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.buildSystemPrompt = buildSystemPrompt;
+exports.buildAgentSystemPrompt = buildAgentSystemPrompt;
 exports.buildUserPrompt = buildUserPrompt;
 const util_1 = __nccwpck_require__(1125);
 function buildSystemPrompt(inputs) {
-    const isAgent = inputs.reviewMode === 'agent';
     const base = `You are a senior software engineer reviewing a GitHub pull request.
 Produce a clear, professional, high-level review.
 
@@ -32410,28 +32412,64 @@ Rules:
 - EXCLUDE trivial noise: never mention missing or extra comments, code-style preferences, or obvious restatements. If there is nothing substantive, return an empty "recommendations" array.
 - "files" should cover the key changed files with concise descriptions and exact paths.
 - Output the JSON object and nothing else.`;
-    const extras = [];
-    if (isAgent) {
-        extras.push(agentModeAddendum());
-    }
-    if (inputs.extraInstructions) {
-        extras.push(`Additional review instructions from the project:\n${inputs.extraInstructions}`);
-    }
-    if (extras.length === 0)
+    if (!inputs.extraInstructions)
         return base;
-    return `${base}\n\n${extras.join('\n\n')}`;
+    return `${base}\n\nAdditional review instructions from the project:\n${inputs.extraInstructions}`;
 }
-function agentModeAddendum() {
-    return `IMPORTANT — AGENT MODE:
-- You have read-only tools to inspect the repository: \`read\` (read a file), \`grep\` (search file contents), \`find\` (find files by name), and \`ls\` (list a directory).
-- **Before asserting any problem**, verify it by reading the relevant files. If you suspect a fix already exists (e.g. in middleware, utility functions, or another part of the codebase), use the tools to confirm.
-- Only make a recommendation if you have verified the issue exists in the code you read.
-- If you need more context, use the tools — do not guess.
-- The repository layout, project guidance, and project documentation are provided in the prompt.
-- Your final response must still be ONLY the JSON review object above — no additional text.`;
+/**
+ * Full system prompt for agent mode, built on pi's default agent-harness
+ * structure (persona → Available tools → Guidelines → Output) but specialized
+ * for PR review.
+ */
+function buildAgentSystemPrompt(inputs) {
+    const persona = `You are an expert coding assistant operating inside pi, a coding agent harness. In this session your task is to review a GitHub pull request: understand the change, investigate the surrounding code with your read-only tools, verify every concern by reading the relevant files, and report a concise, high-level assessment.
+
+Available tools:
+- read: Read file contents
+- grep: Search file contents for patterns (respects .gitignore)
+- find: Find files by glob pattern (respects .gitignore)
+- ls: List directory contents
+
+You have read-only tools only — you cannot create, edit, or delete files.
+
+Guidelines:
+- Use read to examine files instead of cat or sed.
+- Before raising any issue, verify it by reading the relevant file. Do not report a problem you have not confirmed in the code.
+- Be concise and high-level. Do not restate the diff.
+- Show file paths clearly when referencing files.`;
+    const output = `Output format:
+
+Your FINAL response — and nothing else — must be a single valid JSON object with exactly this schema. No markdown, no code fences, no text before or after:
+
+{
+  "background": "1-3 sentences: what this change addresses and why (your understanding of the PR's intent).",
+  "solution": "1-3 sentences: assessment of the implementation approach taken.",
+  "files": [
+    { "path": "<exact path from the diff>", "description": "concise description of what changed in this file" }
+  ],
+  "recommendations": [
+    { "category": "Security | Edge Case | Performance | Refactoring Tip", "note": "a substantive, actionable, verified suggestion" }
+  ]
 }
-function buildUserPrompt(pr, files, ctx) {
+
+Rules:
+- "recommendations": ONLY substantive, verified items — real security risks, meaningful edge cases, performance issues, or genuine refactors. Use an empty array if there is nothing substantive.
+- Never mention code-style, missing/extra comments, or trivial restatements of the diff.
+- "files": the key changed files, using exact paths from the diff.
+- Respond with ONLY the JSON object.`;
+    const sections = [persona];
+    if (inputs.extraInstructions) {
+        sections.push(`Additional review instructions from the project:\n${inputs.extraInstructions}`);
+    }
+    sections.push(output);
+    return sections.join('\n\n');
+}
+function buildUserPrompt(pr, files, ctx, isAgent = false) {
     const parts = [];
+    if (isAgent) {
+        parts.push('Review the pull request below. Investigate the repository with your tools as needed, verify any concern in the code, then respond with ONLY the JSON review object described in your instructions.');
+        parts.push('');
+    }
     parts.push(`# Pull Request #${pr.number}: ${pr.title}`);
     if (pr.body && pr.body.trim()) {
         parts.push('');

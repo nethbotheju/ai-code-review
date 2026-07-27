@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ActionInputs, ApiType, ReviewMode } from '../config/types';
 import type { PromptContext } from './prompt';
-import { buildSystemPrompt, buildUserPrompt } from './prompt';
+import { buildAgentSystemPrompt, buildSystemPrompt, buildUserPrompt } from './prompt';
 import type { ChangedFile } from '../shared/types';
 
 function makeInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
@@ -42,22 +42,56 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Use functional style');
   });
 
-  it('includes pi tool instructions when reviewMode is agent', () => {
+  it('does not emit agent-specific content (agent mode has its own builder)', () => {
     const inputs = makeInputs({ reviewMode: 'agent' });
     const prompt = buildSystemPrompt(inputs);
-    expect(prompt).toContain('AGENT MODE');
-    expect(prompt).toContain('read` (read a file)');
-    expect(prompt).toContain('grep`');
-    expect(prompt).toContain('find`');
-    expect(prompt).toContain('ls`');
-    expect(prompt).toContain('verify it by reading');
+    expect(prompt).not.toContain('AGENT MODE');
+    expect(prompt).not.toContain('operating inside pi');
   });
 
-  it('includes both agent mode and extra instructions', () => {
+  it('includes extra instructions regardless of review mode', () => {
     const inputs = makeInputs({ reviewMode: 'agent', extraInstructions: 'Focus on security.' });
     const prompt = buildSystemPrompt(inputs);
-    expect(prompt).toContain('AGENT MODE');
     expect(prompt).toContain('Focus on security');
+    expect(prompt).not.toContain('AGENT MODE');
+  });
+});
+
+describe('buildAgentSystemPrompt', () => {
+  it('is built on pi agent-harness framing with the read-only tools listed', () => {
+    const prompt = buildAgentSystemPrompt(makeInputs({ reviewMode: 'agent' }));
+    expect(prompt).toContain('expert coding assistant operating inside pi');
+    expect(prompt).toContain('- read: Read file contents');
+    expect(prompt).toContain('- grep: Search file contents for patterns');
+    expect(prompt).toContain('- find: Find files by glob pattern');
+    expect(prompt).toContain('- ls: List directory contents');
+    expect(prompt).toContain('read-only tools only');
+  });
+
+  it('requires verified findings and JSON-only output', () => {
+    const prompt = buildAgentSystemPrompt(makeInputs({ reviewMode: 'agent' }));
+    expect(prompt).toContain('verify it by reading the relevant file');
+    expect(prompt).toContain('Respond with ONLY the JSON object');
+    expect(prompt).toContain('"background"');
+    expect(prompt).toContain('"recommendations"');
+  });
+
+  it('omits pi-internal docs/themes/skills guidance irrelevant to a review', () => {
+    const prompt = buildAgentSystemPrompt(makeInputs({ reviewMode: 'agent' }));
+    expect(prompt).not.toContain('Pi documentation');
+    expect(prompt).not.toContain('themes');
+    expect(prompt).not.toContain('skills');
+  });
+
+  it('injects extra instructions before the output contract', () => {
+    const prompt = buildAgentSystemPrompt({
+      ...makeInputs({ reviewMode: 'agent' }),
+      extraInstructions: 'Focus on SQL injection.',
+    });
+    const instrIdx = prompt.indexOf('Focus on SQL injection');
+    const outputIdx = prompt.indexOf('Output format:');
+    expect(instrIdx).toBeGreaterThan(-1);
+    expect(outputIdx).toBeGreaterThan(instrIdx);
   });
 });
 
@@ -82,6 +116,19 @@ describe('buildUserPrompt', () => {
     expect(result).toContain('# Pull Request #42: Add feature X');
     expect(result).toContain('This PR adds feature X');
     expect(result).toContain('src/index.ts');
+  });
+
+  it('prepends the review task directive in agent mode', () => {
+    const result = buildUserPrompt(mockPr, mockFiles, undefined, true);
+    expect(result.startsWith('Review the pull request below')).toBe(true);
+    expect(result).toContain('ONLY the JSON review object');
+    expect(result).toContain('Investigate the repository with your tools');
+  });
+
+  it('omits the tool directive in standard mode', () => {
+    const result = buildUserPrompt(mockPr, mockFiles);
+    expect(result).not.toContain('Investigate the repository with your tools');
+    expect(result.startsWith('# Pull Request')).toBe(true);
   });
 
   it('includes diff content', () => {

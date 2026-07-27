@@ -9,7 +9,7 @@ import {
   postReview,
   reactToComment,
 } from './github/api';
-import { buildSystemPrompt, buildUserPrompt } from './shared/prompt';
+import { buildAgentSystemPrompt, buildSystemPrompt, buildUserPrompt } from './shared/prompt';
 import { parseReview } from './shared/parse';
 import { formatNoChanges, formatReview } from './shared/format';
 import { runStandardReview } from './modes/standard/runner';
@@ -89,8 +89,10 @@ async function run(): Promise<void> {
     // Build prompts
     const tree = useAgent && repoRoot ? buildRepoTree(repoRoot.path, inputs) : undefined;
     const promptInputs: ActionInputs = useAgent ? inputs : { ...inputs, reviewMode: 'standard' };
-    const systemPrompt = buildSystemPrompt(promptInputs);
-    const userPrompt = buildUserPrompt(pr, fetchResult.files, { docs: contextDocs, tree });
+    const systemPrompt = useAgent
+      ? buildAgentSystemPrompt(promptInputs)
+      : buildSystemPrompt(promptInputs);
+    const userPrompt = buildUserPrompt(pr, fetchResult.files, { docs: contextDocs, tree }, useAgent);
 
     // Run review
     const reviewResult =
