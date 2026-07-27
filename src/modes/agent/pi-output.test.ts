@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parsePiOutput } from './output';
-import type { PiEvent } from './types';
+import { parsePiOutput } from './pi-output';
+import type { PiEvent } from './pi-types';
 import type { ReviewResult } from '../../shared/types';
 
 const REVIEW_JSON = '{"background":"b","solution":"s","files":[],"recommendations":[]}';
@@ -135,5 +135,35 @@ describe('parsePiOutput', () => {
   it('throws when there is no review text at all', () => {
     const events = [ev('turn_end', { message: { role: 'assistant', content: [] } })];
     expect(() => parsePiOutput(events)).toThrow(/no review text/);
+  });
+
+  it('returns undefined token counts when no usage was reported', () => {
+    const events = [
+      ev('agent_end', {
+        messages: [{ role: 'assistant', content: [{ type: 'text', text: REVIEW_JSON }] }],
+      }),
+    ];
+    const result = parsePiOutput(events);
+    expect(result.text).toBe(REVIEW_JSON);
+    expect(result.inputTokens).toBeUndefined();
+    expect(result.outputTokens).toBeUndefined();
+    expect(result.totalTokens).toBeUndefined();
+  });
+
+  it('returns zero steps for an empty event stream', () => {
+    expect(() => parsePiOutput([])).toThrow(/no review text/);
+  });
+
+  it('picks the last non-empty assistant message from agent_end', () => {
+    const events = [
+      ev('agent_end', {
+        messages: [
+          { role: 'assistant', content: [{ type: 'text', text: 'first' }] },
+          { role: 'assistant', content: [] },
+          { role: 'assistant', content: [{ type: 'text', text: REVIEW_JSON }] },
+        ],
+      }),
+    ];
+    expect(parsePiOutput(events).text).toBe(REVIEW_JSON);
   });
 });

@@ -50,7 +50,7 @@ inputs:
     required: false
     default: ''
   use-default-excludes:
-    description: 'Apply the built-in excludes for lockfiles, minified files, build/dist output, etc.'
+    description: 'Apply the built-in excludes for lockfiles, minified files, and sourcemaps. Build artifacts, dependencies, and VCS metadata are always excluded regardless of this setting.'
     required: false
     default: 'true'
 
@@ -64,14 +64,6 @@ inputs:
     description: 'Review mode: standard (single prompt) or agent (tool-enabled investigation loop).'
     required: false
     default: 'standard'
-  agent-max-steps:
-    description: 'Maximum number of LLM steps (tool-call rounds) when review-mode is agent.'
-    required: false
-    default: '8'
-  agent-max-context-bytes:
-    description: 'Maximum bytes of file content the agent may read via tools across all steps.'
-    required: false
-    default: '120000'
   agent-tarball-max-mb:
     description: 'Maximum tarball size in MB for the repo snapshot (agent mode). Larger repos degrade to standard mode.'
     required: false
@@ -80,16 +72,8 @@ inputs:
     description: 'Comma/newline-separated list of markdown doc files to include from the repo root (e.g. AGENTS.md, CONTRIBUTING.md).'
     required: false
     default: ''
-  allow-agent-on-compatible:
-    description: 'Allow agent review-mode on openai-compatible endpoints (tool support depends on the backend). Ignored when agent-engine is pi (pi has first-class openai-compatible support via models.json).'
-    required: false
-    default: 'false'
-  agent-engine:
-    description: 'Agent engine used when review-mode is agent. "builtin" = the built-in generateText tool loop (default, zero install). "pi" = spawn @earendil-works/pi-coding-agent headless with read-only tools (installs ~170MB on the runner, cacheable).'
-    required: false
-    default: 'builtin'
   pi-version:
-    description: 'Version of @earendil-works/pi-coding-agent to install when agent-engine is pi (e.g. 0.82.1, latest).'
+    description: 'Version of @earendil-works/pi-coding-agent to install for agent mode (e.g. 0.82.1, latest).'
     required: false
     default: '0.82.1'
   pi-timeout-ms:

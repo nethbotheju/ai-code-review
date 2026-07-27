@@ -2,17 +2,25 @@ import * as core from '@actions/core';
 import { getOctokit } from '@actions/github';
 import { getInputs } from './config/inputs';
 import { resolveTrigger } from './github/trigger';
-import { fetchPullRequest, fetchChangedFiles } from './github/pull-request';
-import { fetchFileContents } from './github/contents';
-import { postReview, reactToComment } from './github/posting';
-import { buildSystemPrompt, buildUserPrompt } from './review/prompt';
-import { parseReview } from './review/parse';
-import { formatNoChanges, formatReview } from './review/format';
-import { runStandardReview } from './review/run';
-import { createModel } from './llm/models';
-import { runAgentReview } from './agent/runner';
-import { runPiReview } from './agent/pi';
-import { prepareRepoSnapshot, buildRepoTree, cleanupRepoSnapshot, RepoTooLargeError } from './agent/repo-snapshot';
+import {
+  fetchFileContents,
+  fetchPullRequest,
+  fetchChangedFiles,
+  postReview,
+  reactToComment,
+} from './github/api';
+import { buildSystemPrompt, buildUserPrompt } from './shared/prompt';
+import { parseReview } from './shared/parse';
+import { formatNoChanges, formatReview } from './shared/format';
+import { runStandardReview } from './modes/standard/runner';
+import { createModel } from './modes/standard/models';
+import { runAgentReview } from './modes/agent/runner';
+import {
+  prepareRepoSnapshot,
+  buildRepoTree,
+  cleanupRepoSnapshot,
+  RepoTooLargeError,
+} from './modes/agent/snapshot';
 import type { ActionInputs, RepoRoot } from './config/types';
 
 async function run(): Promise<void> {
@@ -44,20 +52,30 @@ async function run(): Promise<void> {
       return;
     }
 
-    const contextDocs = await fetchFileContents(octokit, owner, repo, pr.headSha, inputs.contextDocs, {
-      maxBytes: 10000,
-      maxFiles: 3,
-    });
-
-    const effectiveMode = resolveEffectiveMode(inputs);
-    const model = createModel(inputs);
+    const contextDocs = await fetchFileContents(
+      octokit,
+      owner,
+      repo,
+      pr.headSha,
+      inputs.contextDocs,
+      {
+        maxBytes: 10000,
+        maxFiles: 3,
+      },
+    );
 
     // Whether we actually run agent mode (may degrade if tarball is too large)
-    let useAgent = effectiveMode === 'agent';
+    let useAgent = inputs.reviewMode === 'agent';
 
     if (useAgent) {
       try {
-        repoRoot = await prepareRepoSnapshot(octokit, owner, repo, pr.headSha, inputs.agentTarballMaxMb);
+        repoRoot = await prepareRepoSnapshot(
+          octokit,
+          owner,
+          repo,
+          pr.headSha,
+          inputs.agentTarballMaxMb,
+        );
       } catch (err) {
         if (err instanceof RepoTooLargeError) {
           core.warning(err.message);
@@ -75,12 +93,10 @@ async function run(): Promise<void> {
     const userPrompt = buildUserPrompt(pr, fetchResult.files, { docs: contextDocs, tree });
 
     // Run review
-    const usePiEngine = useAgent && inputs.agentEngine === 'pi';
-    const reviewResult = useAgent && repoRoot
-      ? (usePiEngine
-          ? await runPiReview(systemPrompt, userPrompt, repoRoot, inputs)
-          : await runAgentReview(model, systemPrompt, userPrompt, repoRoot, inputs))
-      : await runStandardReview(model, systemPrompt, userPrompt);
+    const reviewResult =
+      useAgent && repoRoot
+        ? await runAgentReview(systemPrompt, userPrompt, repoRoot, inputs)
+        : await runStandardReview(createModel(inputs), systemPrompt, userPrompt);
 
     core.info(
       `Review done. tokens in=${reviewResult.inputTokens} out=${reviewResult.outputTokens} tot=${reviewResult.totalTokens} steps=${reviewResult.steps}`,
@@ -95,7 +111,8 @@ async function run(): Promise<void> {
     core.info('Posted review.');
     if (commentId) await reactToComment(octokit, owner, repo, commentId, '+1');
   } catch (err) {
-    core.setFailed(`AI code review failed: ${(err as Error).message}`);
+    const e = err as Error;
+    core.setFailed(`AI code review failed: ${e.message}${e.stack ? `\n${e.stack}` : ''}`);
   } finally {
     if (repoRoot) {
       try {
@@ -105,24 +122,6 @@ async function run(): Promise<void> {
       }
     }
   }
-}
-
-function resolveEffectiveMode(inputs: ActionInputs): 'standard' | 'agent' {
-  if (inputs.reviewMode === 'standard') return 'standard';
-  // The pi engine has first-class openai-compatible support via models.json,
-  // so it bypasses the compatibility gate that the builtin tool loop is subject to.
-  if (
-    inputs.apiType === 'openai-compatible' &&
-    inputs.agentEngine !== 'pi' &&
-    !inputs.allowAgentOnCompatible
-  ) {
-    core.warning(
-      'Agent mode requested but api-type is openai-compatible (tool support varies). ' +
-        'Set allow-agent-on-compatible=true to override. Falling back to standard mode.',
-    );
-    return 'standard';
-  }
-  return 'agent';
 }
 
 run();

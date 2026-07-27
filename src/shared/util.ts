@@ -1,15 +1,8 @@
 import { minimatch } from 'minimatch';
-import * as path from 'node:path';
 
 export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max)}…`;
-}
-
-/** Path containment check that is separator-aware (avoids /tmp/foo matching /tmp/foobar). */
-export function isWithin(target: string, base: string): boolean {
-  if (target === base) return true;
-  return target.startsWith(base + path.sep);
 }
 
 export const DEFAULT_EXCLUDES = [
@@ -26,6 +19,10 @@ export const DEFAULT_EXCLUDES = [
   '**/*.min.js',
   '**/*.min.css',
   '**/*.map',
+];
+
+/** Universally-junk paths: build output, dependencies, VCS metadata. Never user-togglable. */
+export const ALWAYS_EXCLUDES = [
   '**/dist/**',
   '**/build/**',
   '**/.next/**',
@@ -40,16 +37,18 @@ export const DEFAULT_EXCLUDES = [
 // Also tests with a trailing slash so `**/node_modules/**` matches the bare dir.
 export function isExcluded(filePath: string, patterns: string[]): boolean {
   return patterns.some(
-    (p) =>
-      minimatch(filePath, p, { matchBase: true, dot: true }) ||
-      minimatch(filePath + '/', p, { matchBase: true, dot: true })
+    (p) => minimatch(filePath, p, { dot: true }) || minimatch(filePath + '/', p, { dot: true }),
   );
 }
 
-/** Resolve the full exclude list (defaults + user patterns) for a given inputs config. */
+/** Resolve the full exclude list (always + optional defaults + user patterns). */
 export function resolveExcludes(opts: {
   useDefaultExcludes: boolean;
   excludePatterns: string[];
 }): string[] {
-  return [...(opts.useDefaultExcludes ? DEFAULT_EXCLUDES : []), ...opts.excludePatterns];
+  return [
+    ...ALWAYS_EXCLUDES,
+    ...(opts.useDefaultExcludes ? DEFAULT_EXCLUDES : []),
+    ...opts.excludePatterns,
+  ];
 }

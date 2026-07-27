@@ -18,12 +18,8 @@ function makeInputs(overrides: Partial<ActionInputs> = {}): ActionInputs {
     excludePatterns: [],
     useDefaultExcludes: true,
     reviewMode: 'standard' as ReviewMode,
-    agentMaxSteps: 8,
-    agentMaxContextBytes: 120000,
     agentTarballMaxMb: 200,
     contextDocs: ['AGENTS.md'],
-    allowAgentOnCompatible: false,
-    agentEngine: 'builtin',
     piVersion: '0.82.1',
     piTimeoutMs: 600000,
     ...overrides,
@@ -46,25 +42,15 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Use functional style');
   });
 
-  it('includes agent-mode instructions when reviewMode is agent', () => {
+  it('includes pi tool instructions when reviewMode is agent', () => {
     const inputs = makeInputs({ reviewMode: 'agent' });
-    const prompt = buildSystemPrompt(inputs);
-    expect(prompt).toContain('AGENT MODE');
-    expect(prompt).toContain('read_file');
-    expect(prompt).toContain('search_files');
-    expect(prompt).toContain('verify it by reading');
-  });
-
-  it('uses pi tool names when agent-engine is pi', () => {
-    const inputs = makeInputs({ reviewMode: 'agent', agentEngine: 'pi' });
     const prompt = buildSystemPrompt(inputs);
     expect(prompt).toContain('AGENT MODE');
     expect(prompt).toContain('read` (read a file)');
     expect(prompt).toContain('grep`');
     expect(prompt).toContain('find`');
     expect(prompt).toContain('ls`');
-    expect(prompt).not.toContain('read_file');
-    expect(prompt).not.toContain('search_files');
+    expect(prompt).toContain('verify it by reading');
   });
 
   it('includes both agent mode and extra instructions', () => {

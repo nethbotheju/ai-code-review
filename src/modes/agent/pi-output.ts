@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import type { ReviewResult } from '../../shared/types';
-import type { PiEvent, PiMessage } from './types';
+import type { PiEvent, PiMessage } from './pi-types';
 
 /** Extract the concatenated text content of a pi message. */
 export function messageText(m: PiMessage): string {
@@ -38,7 +38,9 @@ export function parsePiOutput(events: PiEvent[]): ReviewResult {
   // Final review text = last assistant message that produced text.
   let text = '';
   for (let i = assistantMessages.length - 1; i >= 0; i--) {
-    const t = messageText(assistantMessages[i]);
+    const msg = assistantMessages[i];
+    if (!msg) continue;
+    const t = messageText(msg);
     if (t) {
       text = t;
       break;

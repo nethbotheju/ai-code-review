@@ -1,0 +1,9 @@
+dist
+node_modules
+coverage
+lib
+package-lock.json
+licenses.txt
+.github
+docs
+examples

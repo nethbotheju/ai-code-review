@@ -1,6 +1,6 @@
 import { generateText } from 'ai';
 import type { LanguageModel } from 'ai';
-import type { ReviewResult } from '../shared/types';
+import type { ReviewResult } from '../../shared/types';
 
 /**
  * Run a single-turn standard review (no tools, no snapshot).
@@ -14,7 +14,7 @@ export async function runStandardReview(
   const result = await generateText({
     model,
     instructions,
-    messages: [{ role: 'user', content: userMessage }]
+    messages: [{ role: 'user', content: userMessage }],
   });
 
   const usage = result.usage;

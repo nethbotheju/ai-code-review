@@ -4,18 +4,16 @@ import * as os from 'node:os';
 import * as core from '@actions/core';
 import type { ActionInputs, RepoRoot } from '../../config/types';
 import type { ReviewResult } from '../../shared/types';
-import { buildPiArgs, buildPiEnv } from './args';
-import { buildModelsJson, providerFor } from './provider';
-import { ensurePiInstalled } from './install';
-import { invokePi } from './spawn';
-import { parsePiOutput } from './output';
+import { buildModelsJson, buildPiArgs, buildPiEnv, providerFor } from './pi-args';
+import { ensurePiInstalled, invokePi } from './pi-process';
+import { parsePiOutput } from './pi-output';
 
 /**
- * Run the pi coding agent in headless print mode against the repo snapshot.
- * Installs pi (cached), writes an ephemeral config dir (models.json for
- * openai-compatible), spawns the CLI, and parses its JSONL event stream.
+ * Run the agent-mode review: install the pi subprocess, write an ephemeral
+ * config dir (models.json for openai-compatible), spawn the CLI against the
+ * repo snapshot, and parse its JSONL event stream into a ReviewResult.
  */
-export async function runPiReview(
+export async function runAgentReview(
   systemPrompt: string,
   userPrompt: string,
   repoRoot: RepoRoot,
@@ -61,11 +59,3 @@ export async function runPiReview(
     }
   }
 }
-
-// Public surface re-exports
-export { providerFor, buildModelsJson } from './provider';
-export { buildPiArgs, buildPiEnv } from './args';
-export { parsePiOutput, messageText } from './output';
-export { ensurePiInstalled, installDir, cliEntryPath } from './install';
-export { PI_PACKAGE, PI_CUSTOM_PROVIDER, PI_CUSTOM_API_KEY_ENV } from './constants';
-export type { PiEvent, PiMessage, PiUsage, PiContentPart } from './types';

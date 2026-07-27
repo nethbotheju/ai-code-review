@@ -147,17 +147,13 @@ A complete ready-to-paste branded workflow is in
 | `max-files` | no | `20` | Max changed files reviewed per run |
 | `max-diff-lines` | no | `3000` | Max total added lines reviewed per run |
 | `exclude-patterns` | no | — | Extra glob excludes (comma/newline separated) |
-| `use-default-excludes` | no | `true` | Apply built-in excludes (lockfiles, minified, dist/build, etc.) |
+| `use-default-excludes` | no | `true` | Apply built-in excludes for lockfiles, minified files, and sourcemaps. Build artifacts, dependencies, and VCS metadata are always excluded. |
 | `extra-instructions` | no | — | Extra guidance appended to the prompt |
-| `review-mode` | no | `standard` | Review mode: `standard` (single prompt) or `agent` (tool-enabled investigation loop) |
-| `agent-max-steps` | no | `8` | Max LLM steps (tool-call rounds) when `review-mode` is `agent` |
-| `agent-max-context-bytes` | no | `120000` | Max bytes of file content the agent may read via tools |
+| `review-mode` | no | `standard` | Review mode: `standard` (single prompt) or `agent` (pi-powered investigation loop) |
 | `agent-tarball-max-mb` | no | `200` | Max tarball size in MB for the repo snapshot (larger repos degrade to standard mode) |
 | `context-docs` | no | `AGENTS.md,.ai-review.md,CONTRIBUTING.md` | Markdown doc files to include from the repo root for project guidance |
-| `allow-agent-on-compatible` | no | `false` | Allow agent mode on `openai-compatible` endpoints (ignored when `agent-engine` is `pi`) |
-| `agent-engine` | no | `builtin` | Agent engine: `builtin` (built-in tool loop, zero install) or `pi` (spawn `@earendil-works/pi-coding-agent` headless; installs ~170MB on the runner) |
-| `pi-version` | no | `0.82.1` | Version of `@earendil-works/pi-coding-agent` to install when `agent-engine` is `pi` |
-| `pi-timeout-ms` | no | `600000` | Hard timeout (ms) for a `pi`-engine review run |
+| `pi-version` | no | `0.82.1` | Version of `@earendil-works/pi-coding-agent` to install for agent mode |
+| `pi-timeout-ms` | no | `600000` | Hard timeout (ms) for an agent-mode review run |
 
 ## Outputs
 
@@ -180,43 +176,35 @@ The review is posted as a single, structured document:
 ## Agent mode (`review-mode: agent`)
 
 When `review-mode` is `agent`, the action downloads the full repo at the PR head
-as a tarball (one API call) and gives the model read-only tools to investigate
-the codebase before making recommendations. There are two engines:
+as a tarball (one API call) and spawns [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi)
+headless with read-only tools (`read`, `grep`, `find`, `ls`) to investigate the
+codebase before making recommendations. This uses pi's battle-tested loop
+(compaction, retries, parallel tool execution).
 
-- **`agent-engine: builtin`** (default, zero install) — the built-in Vercel AI SDK
-  tool loop with two tools:
-  - **`read_file`** — read any file in the repo, with optional line ranges.
-  - **`search_files`** — pattern/regex search across the repo.
-  The loop runs up to `agent-max-steps` rounds; `agent-max-context-bytes` caps
-  total file bytes read.
+Pi is installed on the runner on first use (`npm install`, ~170MB) and cached
+under `~/.cache/ai-code-review-pi`; cache that path across runs to avoid
+reinstalling. The API key is passed via environment variable (never in argv),
+`openai-compatible` endpoints are configured via an ephemeral `models.json`, and
+a hard `pi-timeout-ms` guards against runaway loops (pi has no built-in step
+cap). See [`examples/workflow-pi.yml`](./examples/workflow-pi.yml)
+for a complete example.
 
-- **`agent-engine: pi`** — spawns [`@earendil-works/pi-coding-agent`](https://github.com/earendil-works/pi)
-  headless with read-only tools (`read`, `grep`, `find`, `ls`). This uses pi's
-  battle-tested loop (compaction, retries, parallel tool execution). It is
-  installed on the runner on first use (`npm install`, ~170MB) and cached under
-  `~/.cache/ai-code-review-pi`; cache that path across runs to avoid reinstalling.
-  The API key is passed via environment variable (never in argv), `openai-compatible`
-  endpoints are configured via an ephemeral `models.json`, and a hard `pi-timeout-ms`
-  guards against runaway loops (pi has no built-in step cap).
-
-In both engines the model verifies whether a potential issue truly exists and
-confirms that a fix hasn't already been implemented elsewhere before writing a
-recommendation. See [`examples/workflow-agent.yml`](./examples/workflow-agent.yml)
-(builtin engine) and [`examples/workflow-pi.yml`](./examples/workflow-pi.yml)
+The model verifies whether a potential issue truly exists and confirms that a
+fix hasn't already been implemented elsewhere before writing a recommendation.
 (pi engine).
 
 **Model recommendation:** Agent mode needs a capable model that can use tools
 effectively — Claude Sonnet (`claude-sonnet-4-5`) or GPT-4o class. Smaller/cheaper
 models may loop poorly or produce incorrect tool calls.
 
-**Security note:** Agent mode reads non-diff files from the repo to provide context.
-Files matching patterns like `**/.env*`, `**/secrets/**`, `*.pem`, `*.key` are
-automatically excluded. The repo is never uploaded — it stays on the runner and
+**Security note:** Agent mode spawns pi with read-only tools (`read`, `grep`, `find`,
+`ls`) — no shell, no write, no network, so it cannot mutate the repo or exfiltrate
+data. The API key is injected via environment variable, never exposed in the
+process arguments. The repo snapshot stays on the runner in a temp directory and
 is deleted after the review completes.
 
-**Fallback:** If the repo tarball exceeds `agent-tarball-max-mb`, or if the provider
-does not support tool calling, the action automatically falls back to standard mode
-with a warning.
+**Fallback:** If the repo tarball exceeds `agent-tarball-max-mb`, the action
+automatically degrades to standard mode (a single direct LLM call) with a warning.
 
 ## Development
 

@@ -3,7 +3,12 @@ import type { FileDescription, Recommendation, ReviewDocument } from '../shared/
 export function parseReview(raw: string): ReviewDocument {
   const text = extractJson(raw);
   const parsed = parseLenient(text);
-  const obj = (parsed ?? {}) as Record<string, unknown>;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `Model response was not a JSON object: ${typeof parsed === 'object' ? (Array.isArray(parsed) ? 'array' : 'null') : typeof parsed}.`,
+    );
+  }
+  const obj = parsed as Record<string, unknown>;
 
   return {
     background: asString(obj.background),
@@ -17,7 +22,7 @@ function extractJson(raw: string): string {
   let text = raw.trim();
 
   const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(text);
-  if (fence) text = fence[1].trim();
+  if (fence && fence[1] !== undefined) text = fence[1].trim();
 
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
@@ -33,16 +38,9 @@ function stripComments(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 }
 
-function normalizeQuotes(text: string): string {
-  return text.replace(/"/g, '\\"').replace(/'/g, '"');
-}
-
 function parseLenient(text: string): unknown {
-  const cleaned = stripComments(stripTrailingCommas(text));
-  const candidates = [text, cleaned];
-  if (cleaned.includes("'")) candidates.push(normalizeQuotes(cleaned));
   let lastError: unknown;
-  for (const candidate of candidates) {
+  for (const candidate of [text, stripComments(stripTrailingCommas(text))]) {
     try {
       return JSON.parse(candidate);
     } catch (err) {
@@ -51,7 +49,7 @@ function parseLenient(text: string): unknown {
   }
   const preview = text.length > 400 ? `${text.slice(0, 400)}…` : text;
   throw new Error(
-    `Could not parse model response as JSON (${(lastError as Error).message}). Model response was:\n${preview}`
+    `Could not parse model response as JSON (${(lastError as Error).message}). Model response was:\n${preview}`,
   );
 }
 
@@ -81,7 +79,8 @@ function asRecommendations(value: unknown): Recommendation[] {
       const r = item as Record<string, unknown>;
       const note = typeof r.note === 'string' ? r.note.trim() : '';
       if (!note) return null;
-      const category = typeof r.category === 'string' && r.category.trim() ? r.category.trim() : 'Suggestion';
+      const category =
+        typeof r.category === 'string' && r.category.trim() ? r.category.trim() : 'Suggestion';
       return { category, note };
     })
     .filter((x): x is Recommendation => x !== null);
