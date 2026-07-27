@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { annotatePatch } from './pull-request';
+import { annotatePatch } from './patch';
 
 describe('annotatePatch', () => {
   it('returns empty for an empty patch', () => {

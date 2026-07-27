@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { invokePi } from './spawn';
+import { invokePi, runNpm } from './pi-process';
 
 function makeFakePi(script: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-pi-'));
@@ -18,7 +18,6 @@ describe('invokePi', () => {
   let originalWarningSpy: ReturnType<typeof vi.spyOn> | undefined;
 
   beforeEach(() => {
-    // Silence the @actions/core debug/warning output during tests.
     originalStderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     originalInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     originalWarningSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -117,4 +116,25 @@ describe('invokePi', () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.type).toBe('no_newline');
   });
+});
+
+describe('runNpm', () => {
+  it('rejects with the captured stderr when the command exits non-zero', async () => {
+    await expect(
+      runNpm(
+        [
+          'exec',
+          '--',
+          'node',
+          '-e',
+          'process.stderr.write("EACCES: permission denied"); process.exit(1)',
+        ],
+        os.tmpdir(),
+      ),
+    ).rejects.toThrow(/exited with code 1/);
+  }, 30000);
+
+  it('rejects with a clear error on ENOENT (missing binary)', async () => {
+    await expect(runNpm(['does-not-exist-xyz'], os.tmpdir())).rejects.toThrow();
+  }, 30000);
 });

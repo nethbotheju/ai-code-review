@@ -4,11 +4,9 @@ import * as os from 'node:os';
 import * as core from '@actions/core';
 import type { ActionInputs, RepoRoot } from '../../config/types';
 import type { ReviewResult } from '../../shared/types';
-import { buildPiArgs, buildPiEnv } from './engine/args';
-import { buildModelsJson, providerFor } from './engine/provider';
-import { ensurePiInstalled } from './engine/install';
-import { invokePi } from './engine/spawn';
-import { parsePiOutput } from './engine/output';
+import { buildModelsJson, buildPiArgs, buildPiEnv, providerFor } from './pi-args';
+import { ensurePiInstalled, invokePi } from './pi-process';
+import { parsePiOutput } from './pi-output';
 
 /**
  * Run the agent-mode review: install the pi subprocess, write an ephemeral

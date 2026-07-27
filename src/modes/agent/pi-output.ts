@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
-import type { ReviewResult } from '../../../shared/types';
-import type { PiEvent, PiMessage } from './types';
+import type { ReviewResult } from '../../shared/types';
+import type { PiEvent, PiMessage } from './pi-types';
 
 /** Extract the concatenated text content of a pi message. */
 export function messageText(m: PiMessage): string {

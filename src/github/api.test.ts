@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, type Mock } from 'vitest';
-import { fetchFileContents } from './contents';
-import type { OctokitLike } from './types';
+import { fetchFileContents, postReview, reactToComment, type OctokitLike } from './api';
+import type { ReviewComment } from '../shared/types';
+
+// --- fetchFileContents ---
 
 function makeOctokit(respond: (path: string) => Promise<string> | string) {
   return {
@@ -57,7 +59,7 @@ describe('fetchFileContents', () => {
         }
         return { data: `body of ${opts.path}` };
       }),
-    } as never;
+    } as unknown as OctokitLike;
     const out = await fetchFileContents(octokit, 'o', 'r', 'main', ['missing.md', 'AGENTS.md'], {
       maxBytes: 1000,
       maxFiles: 3,
@@ -73,7 +75,7 @@ describe('fetchFileContents', () => {
         err.status = 404;
         throw err;
       }),
-    } as never;
+    } as unknown as OctokitLike;
     const out = await fetchFileContents(octokit, 'o', 'r', 'main', ['a.md', 'b.md'], {
       maxBytes: 1000,
       maxFiles: 3,
@@ -88,5 +90,72 @@ describe('fetchFileContents', () => {
       maxFiles: 2,
     });
     expect(asRequestMock(octokit)).toHaveBeenCalledTimes(2);
+  });
+});
+
+// --- postReview ---
+
+interface OctokitMocks {
+  createReview: Mock;
+  createReaction: Mock;
+}
+
+function makePostingOctokit(overrides: Partial<OctokitMocks> = {}): OctokitLike {
+  const mocks: OctokitMocks = {
+    createReview: overrides.createReview ?? vi.fn().mockResolvedValue({ data: { id: 1 } }),
+    createReaction: overrides.createReaction ?? vi.fn().mockResolvedValue({ data: { id: 1 } }),
+  };
+  return {
+    rest: {
+      pulls: { createReview: mocks.createReview },
+      reactions: { createForIssueComment: mocks.createReaction },
+    },
+  } as unknown as OctokitLike;
+}
+
+describe('postReview', () => {
+  it('maps ReviewComment to the octokit shape and sends the review', async () => {
+    const octokit = makePostingOctokit();
+    const comments: ReviewComment[] = [
+      { path: 'src/a.ts', line: 10, side: 'RIGHT', body: 'Fix this' },
+    ];
+    await postReview(octokit, 'o', 'r', 1, 'sha', 'body', comments);
+    expect(octokit.rest.pulls.createReview as unknown as Mock).toHaveBeenCalledWith({
+      owner: 'o',
+      repo: 'r',
+      pull_number: 1,
+      commit_id: 'sha',
+      event: 'COMMENT',
+      body: 'body',
+      comments: [{ path: 'src/a.ts', line: 10, side: 'RIGHT', body: 'Fix this' }],
+    });
+  });
+
+  it('sends an empty comments array when none provided', async () => {
+    const octokit = makePostingOctokit();
+    await postReview(octokit, 'o', 'r', 1, 'sha', 'body', []);
+    expect(octokit.rest.pulls.createReview as unknown as Mock).toHaveBeenCalledWith(
+      expect.objectContaining({ comments: [] }),
+    );
+  });
+});
+
+describe('reactToComment', () => {
+  it('sends a reaction with the given content', async () => {
+    const octokit = makePostingOctokit();
+    await reactToComment(octokit, 'o', 'r', 42, 'eyes');
+    expect(octokit.rest.reactions.createForIssueComment as unknown as Mock).toHaveBeenCalledWith({
+      owner: 'o',
+      repo: 'r',
+      comment_id: 42,
+      content: 'eyes',
+    });
+  });
+
+  it('swallows errors instead of throwing', async () => {
+    const octokit = makePostingOctokit({
+      createReaction: vi.fn().mockRejectedValue(new Error('boom')),
+    });
+    await expect(reactToComment(octokit, 'o', 'r', 42, '+1')).resolves.toBeUndefined();
   });
 });

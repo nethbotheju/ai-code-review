@@ -1,7 +1,11 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { spawn } from 'node:child_process';
-import * as core from '@actions/core';
 import { createInterface } from 'node:readline';
-import type { PiEvent } from './types';
+import * as core from '@actions/core';
+import { PI_PACKAGE } from './pi-args';
+import type { PiEvent } from './pi-types';
 
 const SIGKILL_DELAY_MS = 5000;
 
@@ -11,6 +15,65 @@ function isPiEvent(value: unknown): value is PiEvent {
     value !== null &&
     typeof (value as { type?: unknown }).type === 'string'
   );
+}
+
+/** Directory where pi is installed. Cacheable by consumers across runs. */
+export function installDir(version: string): string {
+  return path.join(os.homedir(), '.cache', 'ai-code-review-pi', version);
+}
+
+/** Absolute path to the bundled CLI entry inside the install dir. */
+export function cliEntryPath(version: string): string {
+  return path.join(installDir(version), 'node_modules', PI_PACKAGE, 'dist', 'cli.js');
+}
+
+/**
+ * Ensure pi is installed for the given version. Idempotent: skips if the CLI
+ * entry already exists (so consumers can cache `~/.cache/ai-code-review-pi`).
+ * Returns the absolute path to the bundled CLI entry point.
+ */
+export async function ensurePiInstalled(version: string): Promise<string> {
+  const entry = cliEntryPath(version);
+  if (fs.existsSync(entry)) {
+    core.info(`pi ${version} found at ${installDir(version)} (cached).`);
+    return entry;
+  }
+
+  const dir = installDir(version);
+  fs.mkdirSync(dir, { recursive: true });
+  core.info(`Installing ${PI_PACKAGE}@${version} into ${dir} ...`);
+
+  await runNpm(
+    ['install', '--ignore-scripts', '--no-audit', '--no-fund', `${PI_PACKAGE}@${version}`],
+    dir,
+  );
+
+  if (!fs.existsSync(entry)) {
+    throw new Error(`npm reported success but the pi CLI entry was not found at ${entry}.`);
+  }
+  core.info('pi installed.');
+  return entry;
+}
+
+/** Run an npm command in `cwd`. Streams stdout live; captures stderr to include in the failure message. */
+export function runNpm(args: string[], cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let stderr = '';
+    const child = spawn('npm', args, { cwd, stdio: ['inherit', 'inherit', 'pipe'] });
+    child.stderr?.setEncoding('utf-8');
+    child.stderr?.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        const tail = stderr.length > 4000 ? `…${stderr.slice(-4000)}` : stderr;
+        reject(new Error(`npm ${args.join(' ')} exited with code ${code}.\nstderr:\n${tail}`));
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 /**

@@ -3,9 +3,8 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { x as tarExtract } from 'tar';
 import * as core from '@actions/core';
-import { downloadTarball } from '../../github/contents';
+import { downloadTarball, type OctokitLike } from '../../github/api';
 import { isExcluded, resolveExcludes } from '../../shared/util';
-import type { OctokitLike } from '../../github/types';
 import type { ActionInputs, RepoRoot } from '../../config/types';
 
 const MAX_TREE_ENTRIES = 200;

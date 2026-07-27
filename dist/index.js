@@ -31061,176 +31061,7 @@ function getInputs() {
 
 /***/ }),
 
-/***/ 3113:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.downloadTarball = downloadTarball;
-exports.fetchFileContents = fetchFileContents;
-const core = __importStar(__nccwpck_require__(7484));
-/**
- * Download a repo tarball at a ref via the octokit client (GHE-aware).
- * Returns the raw bytes plus the Content-Length in MB (for size guards).
- */
-async function downloadTarball(octokit, owner, repo, ref) {
-    const { data, headers } = await octokit.rest.repos.downloadTarballArchive({ owner, repo, ref });
-    if (!Buffer.isBuffer(data)) {
-        throw new Error(`Expected Buffer from downloadTarballArchive, got ${data?.constructor?.name ?? typeof data}.`);
-    }
-    const clHeader = headers['content-length'];
-    const contentLengthMb = clHeader ? Number(clHeader) / (1024 * 1024) : null;
-    return { buffer: data, contentLengthMb };
-}
-/**
- * Fetch one or more text files (e.g. project docs) from the repo at a ref.
- * Uses the Contents API with the raw media type (GHE-aware). Missing files are skipped.
- */
-async function fetchFileContents(octokit, owner, repo, ref, paths, opts) {
-    if (!paths.length)
-        return '';
-    const parts = [];
-    let count = 0;
-    for (const rawPath of paths.slice(0, opts.maxFiles)) {
-        const name = rawPath.trim();
-        if (!name)
-            continue;
-        try {
-            const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-                owner,
-                repo,
-                path: name,
-                ref,
-                mediaType: { format: 'raw' },
-            });
-            const text = typeof data === 'string' ? data : String(data);
-            const body = text.length > opts.maxBytes ? `${text.slice(0, opts.maxBytes)}…` : text;
-            parts.push(`## ${name}\n\n${body}`);
-            count++;
-        }
-        catch (err) {
-            const status = err.status;
-            if (status !== 404) {
-                core.debug(`Failed to fetch ${name}: ${err.message}`);
-            }
-        }
-    }
-    return count === 0 ? '' : parts.join('\n\n');
-}
-
-
-/***/ }),
-
-/***/ 6770:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.postReview = postReview;
-exports.reactToComment = reactToComment;
-const core = __importStar(__nccwpck_require__(7484));
-async function postReview(octokit, owner, repo, pullNumber, headSha, body, comments) {
-    await octokit.rest.pulls.createReview({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        commit_id: headSha,
-        event: 'COMMENT',
-        body,
-        comments: comments.map((c) => ({
-            path: c.path,
-            line: c.line,
-            side: c.side,
-            body: c.body,
-        })),
-    });
-}
-async function reactToComment(octokit, owner, repo, commentId, content) {
-    try {
-        await octokit.rest.reactions.createForIssueComment({
-            owner,
-            repo,
-            comment_id: commentId,
-            content,
-        });
-    }
-    catch (err) {
-        core.warning(`Could not add reaction to comment: ${err.message}`);
-    }
-}
-
-
-/***/ }),
-
-/***/ 2524:
+/***/ 8943:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -31271,9 +31102,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.fetchPullRequest = fetchPullRequest;
 exports.fetchChangedFiles = fetchChangedFiles;
-exports.annotatePatch = annotatePatch;
+exports.downloadTarball = downloadTarball;
+exports.fetchFileContents = fetchFileContents;
+exports.postReview = postReview;
+exports.reactToComment = reactToComment;
 const core = __importStar(__nccwpck_require__(7484));
+const patch_1 = __nccwpck_require__(1087);
 const util_1 = __nccwpck_require__(1125);
+// --- Pull request ---
 async function fetchPullRequest(octokit, owner, repo, pullNumber) {
     const { data } = await octokit.rest.pulls.get({ owner, repo, pull_number: pullNumber });
     return {
@@ -31324,7 +31160,7 @@ async function fetchChangedFiles(octokit, owner, repo, pullNumber, inputs) {
         status: f.status,
         additions: f.additions,
         deletions: f.deletions,
-        lines: annotatePatch(f.patch),
+        lines: (0, patch_1.annotatePatch)(f.patch),
     }));
     core.info(`Found ${all.length} changed file(s); ${candidates.length} reviewable; reviewing ${files.length}.`);
     return {
@@ -31335,38 +31171,83 @@ async function fetchChangedFiles(octokit, owner, repo, pullNumber, inputs) {
         truncatedReason,
     };
 }
-function annotatePatch(patch) {
-    const result = [];
-    const raw = patch.split('\n');
-    let currentNew = 0;
-    let inHunk = false;
-    const hunkRe = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
-    for (const line of raw) {
-        const hunk = hunkRe.exec(line);
-        if (hunk && hunk[1] !== undefined) {
-            currentNew = Number.parseInt(hunk[1], 10);
-            inHunk = true;
+/**
+ * Download a repo tarball at a ref via the octokit client (GHE-aware).
+ * Returns the raw bytes plus the Content-Length in MB (for size guards).
+ */
+async function downloadTarball(octokit, owner, repo, ref) {
+    const { data, headers } = await octokit.rest.repos.downloadTarballArchive({ owner, repo, ref });
+    if (!Buffer.isBuffer(data)) {
+        throw new Error(`Expected Buffer from downloadTarballArchive, got ${data?.constructor?.name ?? typeof data}.`);
+    }
+    const clHeader = headers['content-length'];
+    const contentLengthMb = clHeader ? Number(clHeader) / (1024 * 1024) : null;
+    return { buffer: data, contentLengthMb };
+}
+/**
+ * Fetch one or more text files (e.g. project docs) from the repo at a ref.
+ * Uses the Contents API with the raw media type (GHE-aware). Missing files are skipped.
+ */
+async function fetchFileContents(octokit, owner, repo, ref, paths, opts) {
+    if (!paths.length)
+        return '';
+    const parts = [];
+    let count = 0;
+    for (const rawPath of paths.slice(0, opts.maxFiles)) {
+        const name = rawPath.trim();
+        if (!name)
             continue;
+        try {
+            const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+                owner,
+                repo,
+                path: name,
+                ref,
+                mediaType: { format: 'raw' },
+            });
+            const text = typeof data === 'string' ? data : String(data);
+            const body = text.length > opts.maxBytes ? `${text.slice(0, opts.maxBytes)}…` : text;
+            parts.push(`## ${name}\n\n${body}`);
+            count++;
         }
-        if (!inHunk)
-            continue;
-        if (line.startsWith('+')) {
-            result.push({ type: 'add', newLine: currentNew, content: line.slice(1) });
-            currentNew++;
-        }
-        else if (line.startsWith('-')) {
-            result.push({ type: 'delete', content: line.slice(1) });
-        }
-        else if (line.startsWith('\\')) {
-            continue;
-        }
-        else {
-            const content = line.startsWith(' ') ? line.slice(1) : line;
-            result.push({ type: 'context', newLine: currentNew, content });
-            currentNew++;
+        catch (err) {
+            const status = err.status;
+            if (status !== 404) {
+                core.debug(`Failed to fetch ${name}: ${err.message}`);
+            }
         }
     }
-    return result;
+    return count === 0 ? '' : parts.join('\n\n');
+}
+// --- Posting ---
+async function postReview(octokit, owner, repo, pullNumber, headSha, body, comments) {
+    await octokit.rest.pulls.createReview({
+        owner,
+        repo,
+        pull_number: pullNumber,
+        commit_id: headSha,
+        event: 'COMMENT',
+        body,
+        comments: comments.map((c) => ({
+            path: c.path,
+            line: c.line,
+            side: c.side,
+            body: c.body,
+        })),
+    });
+}
+async function reactToComment(octokit, owner, repo, commentId, content) {
+    try {
+        await octokit.rest.reactions.createForIssueComment({
+            owner,
+            repo,
+            comment_id: commentId,
+            content,
+        });
+    }
+    catch (err) {
+        core.warning(`Could not add reaction to comment: ${err.message}`);
+    }
 }
 
 
@@ -31485,9 +31366,7 @@ const core = __importStar(__nccwpck_require__(7484));
 const github_1 = __nccwpck_require__(3228);
 const inputs_1 = __nccwpck_require__(4389);
 const trigger_1 = __nccwpck_require__(7131);
-const pull_request_1 = __nccwpck_require__(2524);
-const contents_1 = __nccwpck_require__(3113);
-const posting_1 = __nccwpck_require__(6770);
+const api_1 = __nccwpck_require__(8943);
 const prompt_1 = __nccwpck_require__(4663);
 const parse_1 = __nccwpck_require__(9742);
 const format_1 = __nccwpck_require__(6338);
@@ -31508,18 +31387,18 @@ async function run() {
         const { owner, repo, pullNumber, commentId } = trigger.review;
         const octokit = (0, github_1.getOctokit)(inputs.githubToken);
         if (commentId)
-            await (0, posting_1.reactToComment)(octokit, owner, repo, commentId, 'eyes');
-        const pr = await (0, pull_request_1.fetchPullRequest)(octokit, owner, repo, pullNumber);
+            await (0, api_1.reactToComment)(octokit, owner, repo, commentId, 'eyes');
+        const pr = await (0, api_1.fetchPullRequest)(octokit, owner, repo, pullNumber);
         core.info(`Reviewing PR #${pullNumber}: ${pr.title}`);
-        const fetchResult = await (0, pull_request_1.fetchChangedFiles)(octokit, owner, repo, pullNumber, inputs);
+        const fetchResult = await (0, api_1.fetchChangedFiles)(octokit, owner, repo, pullNumber, inputs);
         if (fetchResult.files.length === 0) {
-            await (0, posting_1.postReview)(octokit, owner, repo, pullNumber, pr.headSha, (0, format_1.formatNoChanges)(), []);
+            await (0, api_1.postReview)(octokit, owner, repo, pullNumber, pr.headSha, (0, format_1.formatNoChanges)(), []);
             core.info('No reviewable changes; posted a skip notice.');
             if (commentId)
-                await (0, posting_1.reactToComment)(octokit, owner, repo, commentId, 'rocket');
+                await (0, api_1.reactToComment)(octokit, owner, repo, commentId, 'rocket');
             return;
         }
-        const contextDocs = await (0, contents_1.fetchFileContents)(octokit, owner, repo, pr.headSha, inputs.contextDocs, {
+        const contextDocs = await (0, api_1.fetchFileContents)(octokit, owner, repo, pr.headSha, inputs.contextDocs, {
             maxBytes: 10000,
             maxFiles: 3,
         });
@@ -31552,11 +31431,11 @@ async function run() {
         // Parse, format, post
         const doc = (0, parse_1.parseReview)(reviewResult.text);
         const body = (0, format_1.formatReview)(doc, fetchResult.files);
-        await (0, posting_1.postReview)(octokit, owner, repo, pullNumber, pr.headSha, body, []);
+        await (0, api_1.postReview)(octokit, owner, repo, pullNumber, pr.headSha, body, []);
         core.setOutput('summary', doc.solution || doc.background);
         core.info('Posted review.');
         if (commentId)
-            await (0, posting_1.reactToComment)(octokit, owner, repo, commentId, '+1');
+            await (0, api_1.reactToComment)(octokit, owner, repo, commentId, '+1');
     }
     catch (err) {
         const e = err;
@@ -31578,16 +31457,23 @@ run();
 
 /***/ }),
 
-/***/ 6784:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ 5149:
+/***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.PI_CUSTOM_API_KEY_ENV = exports.PI_CUSTOM_PROVIDER = exports.PI_PACKAGE = void 0;
+exports.providerFor = providerFor;
+exports.buildModelsJson = buildModelsJson;
 exports.buildPiArgs = buildPiArgs;
 exports.buildPiEnv = buildPiEnv;
-const constants_1 = __nccwpck_require__(8896);
-const provider_1 = __nccwpck_require__(3880);
+/** npm package name, used to install pi on the runner at runtime. */
+exports.PI_PACKAGE = '@earendil-works/pi-coding-agent';
+/** Provider id registered in models.json for openai-compatible endpoints. */
+exports.PI_CUSTOM_PROVIDER = 'custom';
+/** Env var referenced by models.json ($ interpolation) for the compatible key. */
+exports.PI_CUSTOM_API_KEY_ENV = 'CUSTOM_API_KEY';
 /** Headless, ephemeral, read-only flags. Reused across runs and asserted by tests. */
 const PI_FLAGS = [
     '-p', // print mode: process the prompt and exit
@@ -31605,6 +31491,45 @@ const PI_FLAGS = [
     '--tools',
     'read,grep,find,ls', // read-only investigation tools (no bash/edit/write)
 ];
+/** Map the action's api-type to a pi provider id. */
+function providerFor(inputs) {
+    switch (inputs.apiType) {
+        case 'anthropic':
+            return 'anthropic';
+        case 'openai':
+            return 'openai';
+        case 'openai-compatible':
+            return exports.PI_CUSTOM_PROVIDER;
+        default: {
+            const _exhaustive = inputs.apiType;
+            throw new Error(`Unsupported api-type: ${_exhaustive}`);
+        }
+    }
+}
+/**
+ * Build the models.json content for an openai-compatible endpoint. The key is
+ * referenced via env interpolation ($CUSTOM_API_KEY) so it never
+ * appears in argv or on disk in plaintext beyond the process env.
+ */
+function buildModelsJson(inputs) {
+    if (inputs.apiType !== 'openai-compatible') {
+        throw new Error('buildModelsJson is only for openai-compatible.');
+    }
+    return {
+        providers: {
+            [exports.PI_CUSTOM_PROVIDER]: {
+                name: 'AI Review Compatible',
+                baseUrl: inputs.baseUrl,
+                api: 'openai-completions',
+                apiKey: `$${exports.PI_CUSTOM_API_KEY_ENV}`,
+                // Maximise compatibility with arbitrary OpenAI-compatible servers:
+                // send the system prompt as a `system` message and skip reasoning knobs.
+                compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+                models: [{ id: inputs.model }],
+            },
+        },
+    };
+}
 /**
  * Build the pi CLI args for a headless read-only review run.
  * Assumes models.json (for compatible) has already been written to the config dir.
@@ -31615,7 +31540,7 @@ function buildPiArgs(systemPrompt, userPrompt, inputs) {
         '--system-prompt',
         systemPrompt,
         '--provider',
-        (0, provider_1.providerFor)(inputs),
+        providerFor(inputs),
         '--model',
         inputs.model,
         userPrompt,
@@ -31634,7 +31559,7 @@ function buildPiEnv(inputs, configDir) {
         env.OPENAI_API_KEY = inputs.apiKey;
     }
     else {
-        env[constants_1.PI_CUSTOM_API_KEY_ENV] = inputs.apiKey;
+        env[exports.PI_CUSTOM_API_KEY_ENV] = inputs.apiKey;
     }
     return env;
 }
@@ -31642,128 +31567,7 @@ function buildPiEnv(inputs, configDir) {
 
 /***/ }),
 
-/***/ 8896:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-/** Shared constants for the pi engine. */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.PI_CUSTOM_API_KEY_ENV = exports.PI_CUSTOM_PROVIDER = exports.PI_PACKAGE = void 0;
-/** npm package name, used to install pi on the runner at runtime. */
-exports.PI_PACKAGE = '@earendil-works/pi-coding-agent';
-/** Provider id registered in models.json for openai-compatible endpoints. */
-exports.PI_CUSTOM_PROVIDER = 'custom';
-/** Env var referenced by models.json ($ interpolation) for the compatible key. */
-exports.PI_CUSTOM_API_KEY_ENV = 'CUSTOM_API_KEY';
-
-
-/***/ }),
-
-/***/ 6742:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.installDir = installDir;
-exports.cliEntryPath = cliEntryPath;
-exports.ensurePiInstalled = ensurePiInstalled;
-exports.runNpm = runNpm;
-const fs = __importStar(__nccwpck_require__(3024));
-const path = __importStar(__nccwpck_require__(6760));
-const os = __importStar(__nccwpck_require__(8161));
-const node_child_process_1 = __nccwpck_require__(1421);
-const core = __importStar(__nccwpck_require__(7484));
-const constants_1 = __nccwpck_require__(8896);
-/** Directory where pi is installed. Cacheable by consumers across runs. */
-function installDir(version) {
-    return path.join(os.homedir(), '.cache', 'ai-code-review-pi', version);
-}
-/** Absolute path to the bundled CLI entry inside the install dir. */
-function cliEntryPath(version) {
-    return path.join(installDir(version), 'node_modules', constants_1.PI_PACKAGE, 'dist', 'cli.js');
-}
-/**
- * Ensure pi is installed for the given version. Idempotent: skips if the CLI
- * entry already exists (so consumers can cache `~/.cache/ai-code-review-pi`).
- * Returns the absolute path to the bundled CLI entry point.
- */
-async function ensurePiInstalled(version) {
-    const entry = cliEntryPath(version);
-    if (fs.existsSync(entry)) {
-        core.info(`pi ${version} found at ${installDir(version)} (cached).`);
-        return entry;
-    }
-    const dir = installDir(version);
-    fs.mkdirSync(dir, { recursive: true });
-    core.info(`Installing ${constants_1.PI_PACKAGE}@${version} into ${dir} ...`);
-    await runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', `${constants_1.PI_PACKAGE}@${version}`], dir);
-    if (!fs.existsSync(entry)) {
-        throw new Error(`npm reported success but the pi CLI entry was not found at ${entry}.`);
-    }
-    core.info('pi installed.');
-    return entry;
-}
-/** Run an npm command in `cwd`. Streams stdout live; captures stderr to include in the failure message. */
-function runNpm(args, cwd) {
-    return new Promise((resolve, reject) => {
-        let stderr = '';
-        const child = (0, node_child_process_1.spawn)('npm', args, { cwd, stdio: ['inherit', 'inherit', 'pipe'] });
-        child.stderr?.setEncoding('utf-8');
-        child.stderr?.on('data', (chunk) => {
-            stderr += chunk;
-        });
-        child.on('error', reject);
-        child.on('close', (code) => {
-            if (code !== 0) {
-                const tail = stderr.length > 4000 ? `…${stderr.slice(-4000)}` : stderr;
-                reject(new Error(`npm ${args.join(' ')} exited with code ${code}.\nstderr:\n${tail}`));
-            }
-            else {
-                resolve();
-            }
-        });
-    });
-}
-
-
-/***/ }),
-
-/***/ 6880:
+/***/ 7269:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -31881,59 +31685,7 @@ function parsePiOutput(events) {
 
 /***/ }),
 
-/***/ 3880:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.providerFor = providerFor;
-exports.buildModelsJson = buildModelsJson;
-const constants_1 = __nccwpck_require__(8896);
-/** Map the action's api-type to a pi provider id. */
-function providerFor(inputs) {
-    switch (inputs.apiType) {
-        case 'anthropic':
-            return 'anthropic';
-        case 'openai':
-            return 'openai';
-        case 'openai-compatible':
-            return constants_1.PI_CUSTOM_PROVIDER;
-        default: {
-            const _exhaustive = inputs.apiType;
-            throw new Error(`Unsupported api-type: ${_exhaustive}`);
-        }
-    }
-}
-/**
- * Build the models.json content for an openai-compatible endpoint. The key is
- * referenced via env interpolation ($CUSTOM_API_KEY) so it never
- * appears in argv or on disk in plaintext beyond the process env.
- */
-function buildModelsJson(inputs) {
-    if (inputs.apiType !== 'openai-compatible') {
-        throw new Error('buildModelsJson is only for openai-compatible.');
-    }
-    return {
-        providers: {
-            [constants_1.PI_CUSTOM_PROVIDER]: {
-                name: 'AI Review Compatible',
-                baseUrl: inputs.baseUrl,
-                api: 'openai-completions',
-                apiKey: `$${constants_1.PI_CUSTOM_API_KEY_ENV}`,
-                // Maximise compatibility with arbitrary OpenAI-compatible servers:
-                // send the system prompt as a `system` message and skip reasoning knobs.
-                compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
-                models: [{ id: inputs.model }],
-            },
-        },
-    };
-}
-
-
-/***/ }),
-
-/***/ 8194:
+/***/ 7603:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -31972,15 +31724,73 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.installDir = installDir;
+exports.cliEntryPath = cliEntryPath;
+exports.ensurePiInstalled = ensurePiInstalled;
+exports.runNpm = runNpm;
 exports.invokePi = invokePi;
+const fs = __importStar(__nccwpck_require__(3024));
+const path = __importStar(__nccwpck_require__(6760));
+const os = __importStar(__nccwpck_require__(8161));
 const node_child_process_1 = __nccwpck_require__(1421);
-const core = __importStar(__nccwpck_require__(7484));
 const node_readline_1 = __nccwpck_require__(481);
+const core = __importStar(__nccwpck_require__(7484));
+const pi_args_1 = __nccwpck_require__(5149);
 const SIGKILL_DELAY_MS = 5000;
 function isPiEvent(value) {
     return (typeof value === 'object' &&
         value !== null &&
         typeof value.type === 'string');
+}
+/** Directory where pi is installed. Cacheable by consumers across runs. */
+function installDir(version) {
+    return path.join(os.homedir(), '.cache', 'ai-code-review-pi', version);
+}
+/** Absolute path to the bundled CLI entry inside the install dir. */
+function cliEntryPath(version) {
+    return path.join(installDir(version), 'node_modules', pi_args_1.PI_PACKAGE, 'dist', 'cli.js');
+}
+/**
+ * Ensure pi is installed for the given version. Idempotent: skips if the CLI
+ * entry already exists (so consumers can cache `~/.cache/ai-code-review-pi`).
+ * Returns the absolute path to the bundled CLI entry point.
+ */
+async function ensurePiInstalled(version) {
+    const entry = cliEntryPath(version);
+    if (fs.existsSync(entry)) {
+        core.info(`pi ${version} found at ${installDir(version)} (cached).`);
+        return entry;
+    }
+    const dir = installDir(version);
+    fs.mkdirSync(dir, { recursive: true });
+    core.info(`Installing ${pi_args_1.PI_PACKAGE}@${version} into ${dir} ...`);
+    await runNpm(['install', '--ignore-scripts', '--no-audit', '--no-fund', `${pi_args_1.PI_PACKAGE}@${version}`], dir);
+    if (!fs.existsSync(entry)) {
+        throw new Error(`npm reported success but the pi CLI entry was not found at ${entry}.`);
+    }
+    core.info('pi installed.');
+    return entry;
+}
+/** Run an npm command in `cwd`. Streams stdout live; captures stderr to include in the failure message. */
+function runNpm(args, cwd) {
+    return new Promise((resolve, reject) => {
+        let stderr = '';
+        const child = (0, node_child_process_1.spawn)('npm', args, { cwd, stdio: ['inherit', 'inherit', 'pipe'] });
+        child.stderr?.setEncoding('utf-8');
+        child.stderr?.on('data', (chunk) => {
+            stderr += chunk;
+        });
+        child.on('error', reject);
+        child.on('close', (code) => {
+            if (code !== 0) {
+                const tail = stderr.length > 4000 ? `…${stderr.slice(-4000)}` : stderr;
+                reject(new Error(`npm ${args.join(' ')} exited with code ${code}.\nstderr:\n${tail}`));
+            }
+            else {
+                resolve();
+            }
+        });
+    });
 }
 /**
  * Spawn the pi CLI, stream its JSONL stdout into parsed events, and resolve on
@@ -32098,32 +31908,30 @@ const fs = __importStar(__nccwpck_require__(3024));
 const path = __importStar(__nccwpck_require__(6760));
 const os = __importStar(__nccwpck_require__(8161));
 const core = __importStar(__nccwpck_require__(7484));
-const args_1 = __nccwpck_require__(6784);
-const provider_1 = __nccwpck_require__(3880);
-const install_1 = __nccwpck_require__(6742);
-const spawn_1 = __nccwpck_require__(8194);
-const output_1 = __nccwpck_require__(6880);
+const pi_args_1 = __nccwpck_require__(5149);
+const pi_process_1 = __nccwpck_require__(7603);
+const pi_output_1 = __nccwpck_require__(7269);
 /**
  * Run the agent-mode review: install the pi subprocess, write an ephemeral
  * config dir (models.json for openai-compatible), spawn the CLI against the
  * repo snapshot, and parse its JSONL event stream into a ReviewResult.
  */
 async function runAgentReview(systemPrompt, userPrompt, repoRoot, inputs) {
-    const cliEntry = await (0, install_1.ensurePiInstalled)(inputs.piVersion);
+    const cliEntry = await (0, pi_process_1.ensurePiInstalled)(inputs.piVersion);
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-config-'));
     try {
         if (inputs.apiType === 'openai-compatible') {
-            fs.writeFileSync(path.join(configDir, 'models.json'), JSON.stringify((0, provider_1.buildModelsJson)(inputs), null, 2));
+            fs.writeFileSync(path.join(configDir, 'models.json'), JSON.stringify((0, pi_args_1.buildModelsJson)(inputs), null, 2));
         }
-        const args = (0, args_1.buildPiArgs)(systemPrompt, userPrompt, inputs);
-        const env = (0, args_1.buildPiEnv)(inputs, configDir);
-        core.info(`pi engine: provider=${(0, provider_1.providerFor)(inputs)} model=${inputs.model} ` +
+        const args = (0, pi_args_1.buildPiArgs)(systemPrompt, userPrompt, inputs);
+        const env = (0, pi_args_1.buildPiEnv)(inputs, configDir);
+        core.info(`pi engine: provider=${(0, pi_args_1.providerFor)(inputs)} model=${inputs.model} ` +
             `timeout=${inputs.piTimeoutMs}ms`);
-        const { events, stderr } = await (0, spawn_1.invokePi)(cliEntry, args, repoRoot.path, env, inputs.piTimeoutMs);
+        const { events, stderr } = await (0, pi_process_1.invokePi)(cliEntry, args, repoRoot.path, env, inputs.piTimeoutMs);
         if (stderr.trim()) {
             core.warning(`pi stderr (truncated):\n${stderr.trim().slice(0, 2000)}`);
         }
-        return (0, output_1.parsePiOutput)(events);
+        return (0, pi_output_1.parsePiOutput)(events);
     }
     finally {
         try {
@@ -32186,7 +31994,7 @@ const path = __importStar(__nccwpck_require__(6760));
 const os = __importStar(__nccwpck_require__(8161));
 const tar_1 = __nccwpck_require__(5942);
 const core = __importStar(__nccwpck_require__(7484));
-const contents_1 = __nccwpck_require__(3113);
+const api_1 = __nccwpck_require__(8943);
 const util_1 = __nccwpck_require__(1125);
 const MAX_TREE_ENTRIES = 200;
 /** Error thrown when the repo tarball exceeds the configured max size. */
@@ -32203,7 +32011,7 @@ exports.RepoTooLargeError = RepoTooLargeError;
  */
 async function prepareRepoSnapshot(octokit, owner, repo, ref, maxMb) {
     core.info(`Downloading repo snapshot at ${ref}...`);
-    const { buffer, contentLengthMb } = await (0, contents_1.downloadTarball)(octokit, owner, repo, ref);
+    const { buffer, contentLengthMb } = await (0, api_1.downloadTarball)(octokit, owner, repo, ref);
     if (contentLengthMb != null && contentLengthMb > maxMb) {
         throw new RepoTooLargeError(Math.round(contentLengthMb * 10) / 10, maxMb);
     }
@@ -32514,6 +32322,51 @@ function asRecommendations(value) {
         return { category, note };
     })
         .filter((x) => x !== null);
+}
+
+
+/***/ }),
+
+/***/ 1087:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.annotatePatch = annotatePatch;
+/** Parse a unified-diff patch into annotated lines (context/add/delete with new-line numbers). */
+function annotatePatch(patch) {
+    const result = [];
+    const raw = patch.split('\n');
+    let currentNew = 0;
+    let inHunk = false;
+    const hunkRe = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+    for (const line of raw) {
+        const hunk = hunkRe.exec(line);
+        if (hunk && hunk[1] !== undefined) {
+            currentNew = Number.parseInt(hunk[1], 10);
+            inHunk = true;
+            continue;
+        }
+        if (!inHunk)
+            continue;
+        if (line.startsWith('+')) {
+            result.push({ type: 'add', newLine: currentNew, content: line.slice(1) });
+            currentNew++;
+        }
+        else if (line.startsWith('-')) {
+            result.push({ type: 'delete', content: line.slice(1) });
+        }
+        else if (line.startsWith('\\')) {
+            continue;
+        }
+        else {
+            const content = line.startsWith(' ') ? line.slice(1) : line;
+            result.push({ type: 'context', newLine: currentNew, content });
+            currentNew++;
+        }
+    }
+    return result;
 }
 
 

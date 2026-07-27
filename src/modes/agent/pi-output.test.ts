@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { parsePiOutput } from './output';
-import type { PiEvent } from './types';
-import type { ReviewResult } from '../../../shared/types';
+import { parsePiOutput } from './pi-output';
+import type { PiEvent } from './pi-types';
+import type { ReviewResult } from '../../shared/types';
 
 const REVIEW_JSON = '{"background":"b","solution":"s","files":[],"recommendations":[]}';
 

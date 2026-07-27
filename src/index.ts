@@ -2,9 +2,13 @@ import * as core from '@actions/core';
 import { getOctokit } from '@actions/github';
 import { getInputs } from './config/inputs';
 import { resolveTrigger } from './github/trigger';
-import { fetchPullRequest, fetchChangedFiles } from './github/pull-request';
-import { fetchFileContents } from './github/contents';
-import { postReview, reactToComment } from './github/posting';
+import {
+  fetchFileContents,
+  fetchPullRequest,
+  fetchChangedFiles,
+  postReview,
+  reactToComment,
+} from './github/api';
 import { buildSystemPrompt, buildUserPrompt } from './shared/prompt';
 import { parseReview } from './shared/parse';
 import { formatNoChanges, formatReview } from './shared/format';
