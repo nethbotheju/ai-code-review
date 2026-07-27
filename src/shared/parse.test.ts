@@ -79,6 +79,18 @@ describe('parseReview', () => {
     expect(() => parseReview('not json at all')).toThrow(/Could not parse model response/);
   });
 
+  it('throws when the parsed result is an array, not an object', () => {
+    expect(() => parseReview('[1,2,3]')).toThrow(/not a JSON object/);
+  });
+
+  it('throws when the parsed result is null', () => {
+    expect(() => parseReview('null')).toThrow(/not a JSON object/);
+  });
+
+  it('throws when the parsed result is a primitive', () => {
+    expect(() => parseReview('"just a string"')).toThrow(/not a JSON object/);
+  });
+
   it('does not mangle strings containing apostrophes', () => {
     // Previously the parser tried to "fix" single quotes by mangling all quotes,
     // which corrupted any string containing an apostrophe. Now it should just throw.

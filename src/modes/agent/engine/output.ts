@@ -38,7 +38,9 @@ export function parsePiOutput(events: PiEvent[]): ReviewResult {
   // Final review text = last assistant message that produced text.
   let text = '';
   for (let i = assistantMessages.length - 1; i >= 0; i--) {
-    const t = messageText(assistantMessages[i]);
+    const msg = assistantMessages[i];
+    if (!msg) continue;
+    const t = messageText(msg);
     if (t) {
       text = t;
       break;

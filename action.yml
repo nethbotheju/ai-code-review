@@ -50,7 +50,7 @@ inputs:
     required: false
     default: ''
   use-default-excludes:
-    description: 'Apply the built-in excludes for lockfiles, minified files, build/dist output, etc.'
+    description: 'Apply the built-in excludes for lockfiles, minified files, and sourcemaps. Build artifacts, dependencies, and VCS metadata are always excluded regardless of this setting.'
     required: false
     default: 'true'
 

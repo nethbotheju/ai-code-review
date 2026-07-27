@@ -50,22 +50,23 @@ describe('buildModelsJson', () => {
     ) as { providers: Record<string, Record<string, unknown>> };
     const provider = json.providers[PI_CUSTOM_PROVIDER];
     expect(provider).toBeDefined();
-    expect(provider.baseUrl).toBe('https://gw.example.com/v1');
-    expect(provider.api).toBe('openai-completions');
-    expect(provider.apiKey).toBe('$CUSTOM_API_KEY');
+    expect(provider?.baseUrl).toBe('https://gw.example.com/v1');
+    expect(provider?.api).toBe('openai-completions');
+    expect(provider?.apiKey).toBe('$CUSTOM_API_KEY');
     // the plaintext secret must never appear in the generated config
     expect(JSON.stringify(json)).not.toContain('sk-x');
-    const models = provider.models as Array<{ id: string }>;
-    expect(models[0].id).toBe('my-model');
+    const models = provider?.models as Array<{ id: string }> | undefined;
+    expect(models?.[0]?.id).toBe('my-model');
   });
 
   it('opts out of developer role and reasoning knobs for max compatibility', () => {
     const json = buildModelsJson(
       makeInputs({ apiType: 'openai-compatible', baseUrl: 'https://x/v1' }),
     ) as { providers: Record<string, { compat: Record<string, unknown> }> };
-    const compat = json.providers[PI_CUSTOM_PROVIDER].compat;
-    expect(compat.supportsDeveloperRole).toBe(false);
-    expect(compat.supportsReasoningEffort).toBe(false);
+    const compat = json.providers[PI_CUSTOM_PROVIDER]?.compat as
+      Record<string, unknown> | undefined;
+    expect(compat?.supportsDeveloperRole).toBe(false);
+    expect(compat?.supportsReasoningEffort).toBe(false);
   });
 
   it('throws for non-compatible api types', () => {

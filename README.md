@@ -147,7 +147,7 @@ A complete ready-to-paste branded workflow is in
 | `max-files` | no | `20` | Max changed files reviewed per run |
 | `max-diff-lines` | no | `3000` | Max total added lines reviewed per run |
 | `exclude-patterns` | no | — | Extra glob excludes (comma/newline separated) |
-| `use-default-excludes` | no | `true` | Apply built-in excludes (lockfiles, minified, dist/build, etc.) |
+| `use-default-excludes` | no | `true` | Apply built-in excludes for lockfiles, minified files, and sourcemaps. Build artifacts, dependencies, and VCS metadata are always excluded. |
 | `extra-instructions` | no | — | Extra guidance appended to the prompt |
 | `review-mode` | no | `standard` | Review mode: `standard` (single prompt) or `agent` (pi-powered investigation loop) |
 | `agent-tarball-max-mb` | no | `200` | Max tarball size in MB for the repo snapshot (larger repos degrade to standard mode) |

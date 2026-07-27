@@ -31343,7 +31343,7 @@ function annotatePatch(patch) {
     const hunkRe = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
     for (const line of raw) {
         const hunk = hunkRe.exec(line);
-        if (hunk) {
+        if (hunk && hunk[1] !== undefined) {
             currentNew = Number.parseInt(hunk[1], 10);
             inHunk = true;
             continue;
@@ -31838,7 +31838,10 @@ function parsePiOutput(events) {
     // Final review text = last assistant message that produced text.
     let text = '';
     for (let i = assistantMessages.length - 1; i >= 0; i--) {
-        const t = messageText(assistantMessages[i]);
+        const msg = assistantMessages[i];
+        if (!msg)
+            continue;
+        const t = messageText(msg);
         if (t) {
             text = t;
             break;
@@ -32213,7 +32216,9 @@ async function prepareRepoSnapshot(octokit, owner, repo, ref, maxMb) {
         await (0, tar_1.x)({ file: tarballPath, C: extractDir });
         // GitHub tarballs extract to a single top-level directory like "owner-repo-sha/".
         const entries = fs.readdirSync(extractDir).filter((e) => !e.startsWith('.'));
-        const topDir = entries.length === 1 ? path.join(extractDir, entries[0]) : extractDir;
+        const topDir = entries.length === 1 && entries[0] !== undefined
+            ? path.join(extractDir, entries[0])
+            : extractDir;
         core.info(`Repo snapshot extracted to ${topDir}`);
         return { path: topDir, workDir };
     }
@@ -32239,25 +32244,25 @@ function cleanupRepoSnapshot(root) {
 /** Build a compact file-tree representation of the repo for the prompt. */
 function buildRepoTree(root, inputs, maxEntries = MAX_TREE_ENTRIES) {
     const excludes = (0, util_1.resolveExcludes)(inputs);
-    const entries = [];
+    const entries = ['  .'];
     let count = 0;
-    function walk(dir, prefix) {
-        if (count >= maxEntries)
-            return;
+    const stack = [{ dir: root, prefix: '' }];
+    while (stack.length > 0 && count < maxEntries) {
+        const frame = stack.pop();
         let names;
         try {
-            names = fs.readdirSync(dir);
+            names = fs.readdirSync(frame.dir);
         }
         catch (err) {
-            core.debug(`Skipping unreadable directory ${dir}: ${err.message}`);
-            return;
+            core.debug(`Skipping unreadable directory ${frame.dir}: ${err.message}`);
+            continue;
         }
         names.sort();
         for (const name of names) {
             if (count >= maxEntries)
                 break;
-            const fullPath = path.join(dir, name);
-            const relPath = prefix ? `${prefix}/${name}` : name;
+            const fullPath = path.join(frame.dir, name);
+            const relPath = frame.prefix ? `${frame.prefix}/${name}` : name;
             let stat;
             try {
                 stat = fs.statSync(fullPath);
@@ -32271,7 +32276,7 @@ function buildRepoTree(root, inputs, maxEntries = MAX_TREE_ENTRIES) {
             if (stat.isDirectory()) {
                 entries.push(`  ${relPath}/`);
                 count++;
-                walk(fullPath, relPath);
+                stack.push({ dir: fullPath, prefix: relPath });
             }
             else {
                 entries.push(`  ${relPath}`);
@@ -32279,8 +32284,6 @@ function buildRepoTree(root, inputs, maxEntries = MAX_TREE_ENTRIES) {
             }
         }
     }
-    entries.push('  .');
-    walk(root, '');
     if (count >= maxEntries) {
         entries.push(`  … (truncated at ${maxEntries} entries)`);
     }
@@ -32436,7 +32439,10 @@ exports.parseReview = parseReview;
 function parseReview(raw) {
     const text = extractJson(raw);
     const parsed = parseLenient(text);
-    const obj = (parsed ?? {});
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error(`Model response was not a JSON object: ${typeof parsed === 'object' ? (Array.isArray(parsed) ? 'array' : 'null') : typeof parsed}.`);
+    }
+    const obj = parsed;
     return {
         background: asString(obj.background),
         solution: asString(obj.solution),
@@ -32447,7 +32453,7 @@ function parseReview(raw) {
 function extractJson(raw) {
     let text = raw.trim();
     const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(text);
-    if (fence)
+    if (fence && fence[1] !== undefined)
         text = fence[1].trim();
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
@@ -32629,7 +32635,7 @@ function pad(n) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.DEFAULT_EXCLUDES = void 0;
+exports.ALWAYS_EXCLUDES = exports.DEFAULT_EXCLUDES = void 0;
 exports.truncate = truncate;
 exports.isExcluded = isExcluded;
 exports.resolveExcludes = resolveExcludes;
@@ -32653,6 +32659,9 @@ exports.DEFAULT_EXCLUDES = [
     '**/*.min.js',
     '**/*.min.css',
     '**/*.map',
+];
+/** Universally-junk paths: build output, dependencies, VCS metadata. Never user-togglable. */
+exports.ALWAYS_EXCLUDES = [
     '**/dist/**',
     '**/build/**',
     '**/.next/**',
@@ -32667,9 +32676,13 @@ exports.DEFAULT_EXCLUDES = [
 function isExcluded(filePath, patterns) {
     return patterns.some((p) => (0, minimatch_1.minimatch)(filePath, p, { dot: true }) || (0, minimatch_1.minimatch)(filePath + '/', p, { dot: true }));
 }
-/** Resolve the full exclude list (defaults + user patterns) for a given inputs config. */
+/** Resolve the full exclude list (always + optional defaults + user patterns). */
 function resolveExcludes(opts) {
-    return [...(opts.useDefaultExcludes ? exports.DEFAULT_EXCLUDES : []), ...opts.excludePatterns];
+    return [
+        ...exports.ALWAYS_EXCLUDES,
+        ...(opts.useDefaultExcludes ? exports.DEFAULT_EXCLUDES : []),
+        ...opts.excludePatterns,
+    ];
 }
 
 

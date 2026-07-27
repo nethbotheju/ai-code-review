@@ -19,6 +19,10 @@ export const DEFAULT_EXCLUDES = [
   '**/*.min.js',
   '**/*.min.css',
   '**/*.map',
+];
+
+/** Universally-junk paths: build output, dependencies, VCS metadata. Never user-togglable. */
+export const ALWAYS_EXCLUDES = [
   '**/dist/**',
   '**/build/**',
   '**/.next/**',
@@ -37,10 +41,14 @@ export function isExcluded(filePath: string, patterns: string[]): boolean {
   );
 }
 
-/** Resolve the full exclude list (defaults + user patterns) for a given inputs config. */
+/** Resolve the full exclude list (always + optional defaults + user patterns). */
 export function resolveExcludes(opts: {
   useDefaultExcludes: boolean;
   excludePatterns: string[];
 }): string[] {
-  return [...(opts.useDefaultExcludes ? DEFAULT_EXCLUDES : []), ...opts.excludePatterns];
+  return [
+    ...ALWAYS_EXCLUDES,
+    ...(opts.useDefaultExcludes ? DEFAULT_EXCLUDES : []),
+    ...opts.excludePatterns,
+  ];
 }

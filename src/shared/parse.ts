@@ -3,7 +3,12 @@ import type { FileDescription, Recommendation, ReviewDocument } from '../shared/
 export function parseReview(raw: string): ReviewDocument {
   const text = extractJson(raw);
   const parsed = parseLenient(text);
-  const obj = (parsed ?? {}) as Record<string, unknown>;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `Model response was not a JSON object: ${typeof parsed === 'object' ? (Array.isArray(parsed) ? 'array' : 'null') : typeof parsed}.`,
+    );
+  }
+  const obj = parsed as Record<string, unknown>;
 
   return {
     background: asString(obj.background),
@@ -17,7 +22,7 @@ function extractJson(raw: string): string {
   let text = raw.trim();
 
   const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(text);
-  if (fence) text = fence[1].trim();
+  if (fence && fence[1] !== undefined) text = fence[1].trim();
 
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');

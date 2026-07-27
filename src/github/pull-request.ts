@@ -94,7 +94,7 @@ export function annotatePatch(patch: string): AnnotatedLine[] {
 
   for (const line of raw) {
     const hunk = hunkRe.exec(line);
-    if (hunk) {
+    if (hunk && hunk[1] !== undefined) {
       currentNew = Number.parseInt(hunk[1], 10);
       inHunk = true;
       continue;
