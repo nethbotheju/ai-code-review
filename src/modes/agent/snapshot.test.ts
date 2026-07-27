@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { safeResolve, buildRepoTree, RepoTooLargeError } from './snapshot';
+import { buildRepoTree, RepoTooLargeError } from './snapshot';
 
 function createFixtureDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-test-'));
@@ -14,84 +14,8 @@ function createFixtureDir(): string {
   fs.writeFileSync(path.join(dir, 'src/index.ts'), 'console.log("hello");\n');
   fs.writeFileSync(path.join(dir, 'src/utils/auth.ts'), 'export const TOKEN = "abc";\n');
   fs.writeFileSync(path.join(dir, 'README.md'), '# Test\n');
-  try {
-    fs.symlinkSync(path.join(dir, 'src'), path.join(dir, 'linked'), 'dir');
-  } catch {
-    // Symlinks may fail on Windows
-  }
   return dir;
 }
-
-describe('safeResolve', () => {
-  it('resolves a valid relative path', () => {
-    const dir = createFixtureDir();
-    try {
-      const result = safeResolve(dir, 'src/index.ts');
-      expect(result).toBe(path.join(dir, 'src/index.ts'));
-      expect(fs.existsSync(result!)).toBe(true);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects path traversal (../../etc/passwd)', () => {
-    const dir = createFixtureDir();
-    try {
-      const result = safeResolve(dir, '../../etc/passwd');
-      expect(result).toBeNull();
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects same-prefix traversal (../foobar)', () => {
-    const dir = createFixtureDir();
-    try {
-      // dir=/tmp/xxx, ../foobar -> /tmp/foobar which startsWith('/tmp/xxx') is false due to isWithin
-      const result = safeResolve(dir, `../${path.basename(dir)}2`);
-      expect(result).toBeNull();
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects absolute paths', () => {
-    const result = safeResolve('/tmp', '/etc/passwd');
-    expect(result).toBeNull();
-  });
-
-  it('rejects symlink escapes', () => {
-    const dir = createFixtureDir();
-    try {
-      const linkedDir = path.join(dir, 'linked');
-      if (!fs.existsSync(linkedDir)) return;
-      const result = safeResolve(dir, 'linked/../../etc/passwd');
-      expect(result).toBeNull();
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('allows normal subdirectory access', () => {
-    const dir = createFixtureDir();
-    try {
-      const result = safeResolve(dir, 'src/utils/auth.ts');
-      expect(result).toBe(path.join(dir, 'src/utils/auth.ts'));
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('does not throw for non-existent files', () => {
-    const dir = createFixtureDir();
-    try {
-      const result = safeResolve(dir, 'nonexistent.ts');
-      expect(result).toBe(path.join(dir, 'nonexistent.ts'));
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-});
 
 describe('buildRepoTree', () => {
   it('excludes default patterns and dotfiles', () => {

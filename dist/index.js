@@ -30982,8 +30982,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getInputs = getInputs;
 const core = __importStar(__nccwpck_require__(7484));
-const VALID_API_TYPES = ['openai', 'openai-compatible', 'anthropic'];
-const VALID_REVIEW_MODES = ['standard', 'agent'];
+const VALID_API_TYPES = new Set(['openai', 'openai-compatible', 'anthropic']);
+const VALID_REVIEW_MODES = new Set(['standard', 'agent']);
 const DEFAULT_PI_VERSION = '0.82.1';
 // Injection-safe version spec (semver, prerelease, dist-tag). No spaces/shell metachars.
 const VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._+\-]*$/;
@@ -30993,11 +30993,22 @@ function parseList(value) {
         .map((s) => s.trim())
         .filter(Boolean);
 }
-function getInputs() {
-    const apiType = core.getInput('api-type', { required: true }).trim();
-    if (!VALID_API_TYPES.includes(apiType)) {
-        throw new Error(`Invalid api-type '${apiType}'. Must be one of: ${VALID_API_TYPES.join(', ')}`);
+function parseIntInput(name, fallback) {
+    const raw = core.getInput(name).trim();
+    if (raw === '')
+        return fallback;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 0) {
+        throw new Error(`Invalid ${name} '${raw}'. Must be a non-negative integer.`);
     }
+    return n;
+}
+function getInputs() {
+    const apiTypeRaw = core.getInput('api-type', { required: true }).trim();
+    if (!VALID_API_TYPES.has(apiTypeRaw)) {
+        throw new Error(`Invalid api-type '${apiTypeRaw}'. Must be one of: ${[...VALID_API_TYPES].join(', ')}`);
+    }
+    const apiType = apiTypeRaw;
     const apiKey = core.getInput('api-key', { required: true });
     const baseUrl = core.getInput('base-url').trim() || undefined;
     if (apiType === 'openai-compatible' && !baseUrl) {
@@ -31008,23 +31019,23 @@ function getInputs() {
     const triggerComment = core.getInput('trigger-comment').trim() || '/ai-review';
     const triggerLabel = core.getInput('trigger-label').trim() || 'ai-review';
     const autoReview = core.getBooleanInput('auto-review');
-    const maxFiles = Number.parseInt(core.getInput('max-files').trim() || '20', 10);
-    const maxDiffLines = Number.parseInt(core.getInput('max-diff-lines').trim() || '3000', 10);
+    const maxFiles = parseIntInput('max-files', 20);
+    const maxDiffLines = parseIntInput('max-diff-lines', 3000);
     const excludePatterns = parseList(core.getInput('exclude-patterns'));
     const useDefaultExcludes = core.getBooleanInput('use-default-excludes');
     const extraInstructions = core.getInput('extra-instructions').trim() || undefined;
     const reviewModeRaw = core.getInput('review-mode').trim().toLowerCase() || 'standard';
-    if (!VALID_REVIEW_MODES.includes(reviewModeRaw)) {
-        throw new Error(`Invalid review-mode '${reviewModeRaw}'. Must be one of: ${VALID_REVIEW_MODES.join(', ')}`);
+    if (!VALID_REVIEW_MODES.has(reviewModeRaw)) {
+        throw new Error(`Invalid review-mode '${reviewModeRaw}'. Must be one of: ${[...VALID_REVIEW_MODES].join(', ')}`);
     }
     const reviewMode = reviewModeRaw;
-    const agentTarballMaxMb = Number.parseInt(core.getInput('agent-tarball-max-mb').trim() || '200', 10);
+    const agentTarballMaxMb = parseIntInput('agent-tarball-max-mb', 200);
     const contextDocs = parseList(core.getInput('context-docs'));
     const piVersion = core.getInput('pi-version').trim() || DEFAULT_PI_VERSION;
     if (!VERSION_PATTERN.test(piVersion)) {
         throw new Error(`Invalid pi-version '${piVersion}'. Must be a plain version or dist-tag (e.g. 0.82.1, latest).`);
     }
-    const piTimeoutMs = Number.parseInt(core.getInput('pi-timeout-ms').trim() || '600000', 10);
+    const piTimeoutMs = parseIntInput('pi-timeout-ms', 600000);
     return {
         apiType,
         apiKey,
@@ -31098,26 +31109,12 @@ const core = __importStar(__nccwpck_require__(7484));
  */
 async function downloadTarball(octokit, owner, repo, ref) {
     const { data, headers } = await octokit.rest.repos.downloadTarballArchive({ owner, repo, ref });
-    let buffer;
-    if (Buffer.isBuffer(data)) {
-        buffer = data;
-    }
-    else if (data instanceof ArrayBuffer) {
-        buffer = Buffer.from(data);
-    }
-    else if (data instanceof Uint8Array) {
-        buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
-    }
-    else if (typeof data === 'string') {
-        buffer = Buffer.from(data, 'binary');
-    }
-    else {
-        // Stream fallback (should not occur in the Actions Node runtime)
-        buffer = await streamToBuffer(data);
+    if (!Buffer.isBuffer(data)) {
+        throw new Error(`Expected Buffer from downloadTarballArchive, got ${data?.constructor?.name ?? typeof data}.`);
     }
     const clHeader = headers['content-length'];
     const contentLengthMb = clHeader ? Number(clHeader) / (1024 * 1024) : null;
-    return { buffer, contentLengthMb };
+    return { buffer: data, contentLengthMb };
 }
 /**
  * Fetch one or more text files (e.g. project docs) from the repo at a ref.
@@ -31153,13 +31150,6 @@ async function fetchFileContents(octokit, owner, repo, ref, paths, opts) {
         }
     }
     return count === 0 ? '' : parts.join('\n\n');
-}
-async function streamToBuffer(stream) {
-    const chunks = [];
-    for await (const chunk of stream) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
 }
 
 
@@ -31569,7 +31559,8 @@ async function run() {
             await (0, posting_1.reactToComment)(octokit, owner, repo, commentId, '+1');
     }
     catch (err) {
-        core.setFailed(`AI code review failed: ${err.message}`);
+        const e = err;
+        core.setFailed(`AI code review failed: ${e.message}${e.stack ? `\n${e.stack}` : ''}`);
     }
     finally {
         if (repoRoot) {
@@ -31929,6 +31920,8 @@ function buildModelsJson(inputs) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.invokePi = invokePi;
 const node_child_process_1 = __nccwpck_require__(1421);
+const node_readline_1 = __nccwpck_require__(481);
+const SIGKILL_DELAY_MS = 5000;
 /**
  * Spawn the pi CLI, stream its JSONL stdout into parsed events, and resolve on
  * completion. Enforces a hard timeout (SIGTERM then SIGKILL). Rejects if the
@@ -31938,8 +31931,8 @@ function invokePi(cliEntry, args, cwd, env, timeoutMs) {
     return new Promise((resolve, reject) => {
         const events = [];
         let stderr = '';
-        let stdoutBuf = '';
         let timedOut = false;
+        let killTimer;
         const child = (0, node_child_process_1.spawn)(process.execPath, [cliEntry, ...args], {
             cwd,
             env,
@@ -31948,30 +31941,21 @@ function invokePi(cliEntry, args, cwd, env, timeoutMs) {
         const timer = setTimeout(() => {
             timedOut = true;
             child.kill('SIGTERM');
-            setTimeout(() => {
-                try {
+            killTimer = setTimeout(() => {
+                if (!child.killed)
                     child.kill('SIGKILL');
-                }
-                catch {
-                    /* already dead */
-                }
-            }, 5000);
+            }, SIGKILL_DELAY_MS);
         }, timeoutMs);
-        child.stdout?.setEncoding('utf-8');
-        child.stdout?.on('data', (chunk) => {
-            stdoutBuf += chunk;
-            let nl;
-            while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
-                const line = stdoutBuf.slice(0, nl).trim();
-                stdoutBuf = stdoutBuf.slice(nl + 1);
-                if (!line.startsWith('{'))
-                    continue;
-                try {
-                    events.push(JSON.parse(line));
-                }
-                catch {
-                    /* skip non-JSON lines */
-                }
+        const rl = (0, node_readline_1.createInterface)({ input: child.stdout, crlfDelay: Infinity });
+        rl.on('line', (line) => {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('{'))
+                return;
+            try {
+                events.push(JSON.parse(trimmed));
+            }
+            catch {
+                /* skip non-JSON lines */
             }
         });
         child.stderr?.setEncoding('utf-8');
@@ -31980,19 +31964,14 @@ function invokePi(cliEntry, args, cwd, env, timeoutMs) {
         });
         child.on('error', (err) => {
             clearTimeout(timer);
+            if (killTimer)
+                clearTimeout(killTimer);
             reject(err);
         });
         child.on('close', (code) => {
             clearTimeout(timer);
-            const trailing = stdoutBuf.trim();
-            if (trailing.startsWith('{')) {
-                try {
-                    events.push(JSON.parse(trailing));
-                }
-                catch {
-                    /* skip */
-                }
-            }
+            if (killTimer)
+                clearTimeout(killTimer);
             if (timedOut) {
                 reject(new Error(`pi review timed out after ${timeoutMs}ms.`));
                 return;
@@ -32136,7 +32115,6 @@ exports.RepoTooLargeError = void 0;
 exports.prepareRepoSnapshot = prepareRepoSnapshot;
 exports.cleanupRepoSnapshot = cleanupRepoSnapshot;
 exports.buildRepoTree = buildRepoTree;
-exports.safeResolve = safeResolve;
 const fs = __importStar(__nccwpck_require__(3024));
 const path = __importStar(__nccwpck_require__(6760));
 const os = __importStar(__nccwpck_require__(8161));
@@ -32243,29 +32221,6 @@ function buildRepoTree(root, inputs, maxEntries = MAX_TREE_ENTRIES) {
         entries.push(`  … (truncated at ${maxEntries} entries)`);
     }
     return entries.join('\n');
-}
-/**
- * Safely resolve a relative path against the repo root.
- * Returns null for absolute paths, traversal escapes, or symlink escapes.
- */
-function safeResolve(root, rel) {
-    const normalized = path.normalize(rel).replace(/\\/g, '/');
-    if (path.isAbsolute(normalized))
-        return null;
-    const resolved = path.resolve(root, normalized);
-    if (!(0, util_1.isWithin)(resolved, root))
-        return null;
-    // Resolve symlinks and confirm the real path stays within the real root.
-    try {
-        const realRoot = fs.realpathSync(root);
-        const realResolved = fs.realpathSync(resolved);
-        if (!(0, util_1.isWithin)(realResolved, realRoot))
-            return null;
-    }
-    catch {
-        // Non-existent or broken path — still allow (caller handles missing files).
-    }
-    return resolved;
 }
 
 
@@ -32442,16 +32397,9 @@ function stripTrailingCommas(text) {
 function stripComments(text) {
     return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 }
-function normalizeQuotes(text) {
-    return text.replace(/"/g, '\\"').replace(/'/g, '"');
-}
 function parseLenient(text) {
-    const cleaned = stripComments(stripTrailingCommas(text));
-    const candidates = [text, cleaned];
-    if (cleaned.includes("'"))
-        candidates.push(normalizeQuotes(cleaned));
     let lastError;
-    for (const candidate of candidates) {
+    for (const candidate of [text, stripComments(stripTrailingCommas(text))]) {
         try {
             return JSON.parse(candidate);
         }
@@ -32612,61 +32560,20 @@ function pad(n) {
 /***/ }),
 
 /***/ 1125:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.DEFAULT_EXCLUDES = void 0;
 exports.truncate = truncate;
-exports.isWithin = isWithin;
 exports.isExcluded = isExcluded;
 exports.resolveExcludes = resolveExcludes;
 const minimatch_1 = __nccwpck_require__(6507);
-const path = __importStar(__nccwpck_require__(6760));
 function truncate(text, max) {
     if (text.length <= max)
         return text;
     return `${text.slice(0, max)}…`;
-}
-/** Path containment check that is separator-aware (avoids /tmp/foo matching /tmp/foobar). */
-function isWithin(target, base) {
-    if (target === base)
-        return true;
-    return target.startsWith(base + path.sep);
 }
 exports.DEFAULT_EXCLUDES = [
     '**/package-lock.json',
@@ -32870,6 +32777,14 @@ module.exports = require("node:os");
 
 "use strict";
 module.exports = require("node:path");
+
+/***/ }),
+
+/***/ 481:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:readline");
 
 /***/ }),
 

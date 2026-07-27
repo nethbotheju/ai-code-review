@@ -1,8 +1,6 @@
 import * as core from '@actions/core';
-import { getOctokit } from '@actions/github';
 import type { ReviewComment } from '../shared/types';
-
-type OctokitLike = ReturnType<typeof getOctokit>;
+import type { OctokitLike } from './types';
 
 export async function postReview(
   octokit: OctokitLike,

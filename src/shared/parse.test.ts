@@ -1,0 +1,78 @@
+import { describe, it, expect } from 'vitest';
+import { parseReview } from './parse';
+
+describe('parseReview', () => {
+  it('parses a clean JSON object', () => {
+    const out = parseReview(JSON.stringify({
+      background: 'b',
+      solution: 's',
+      files: [{ path: 'a.ts', description: 'd' }],
+      recommendations: [{ category: 'Security', note: 'n' }],
+    }));
+    expect(out).toEqual({
+      background: 'b',
+      solution: 's',
+      files: [{ path: 'a.ts', description: 'd' }],
+      recommendations: [{ category: 'Security', note: 'n' }],
+    });
+  });
+
+  it('strips a markdown code fence', () => {
+    const fenced = '```json\n{"background":"b","solution":"s","files":[],"recommendations":[]}\n```';
+    expect(parseReview(fenced).background).toBe('b');
+  });
+
+  it('extracts JSON from surrounding prose', () => {
+    const wrapped = 'Here is the review:\n{"background":"b","solution":"s","files":[],"recommendations":[]}\nDone.';
+    expect(parseReview(wrapped).background).toBe('b');
+  });
+
+  it('strips // and /* */ comments', () => {
+    const commented = `{
+      // background note
+      "background": "b",
+      /* inline */
+      "solution": "s",
+      "files": [],
+      "recommendations": []
+    }`;
+    expect(parseReview(commented).background).toBe('b');
+  });
+
+  it('strips trailing commas inside arrays and objects', () => {
+    const trailing = '{"background":"b","solution":"s","files":[{"path":"a",},{"path":"b",}],"recommendations":[]}';
+    const trailingObj = '{"background":"b","solution":"s","files":[],"recommendations":[{"note":"n",},]}';
+    expect(parseReview(trailing).files).toEqual([
+      { path: 'a', description: '' },
+      { path: 'b', description: '' },
+    ]);
+    expect(parseReview(trailingObj).recommendations[0]?.note).toBe('n');
+  });
+
+  it('defaults missing arrays to empty', () => {
+    const out = parseReview('{"background":"b","solution":"s"}');
+    expect(out.files).toEqual([]);
+    expect(out.recommendations).toEqual([]);
+  });
+
+  it('skips files with empty path', () => {
+    const out = parseReview('{"background":"b","solution":"s","files":[{"path":"","description":"d"},{"path":"x","description":"y"}],"recommendations":[]}');
+    expect(out.files).toEqual([{ path: 'x', description: 'y' }]);
+  });
+
+  it('substitutes "Suggestion" for missing recommendation category', () => {
+    const out = parseReview('{"background":"b","solution":"s","files":[],"recommendations":[{"note":"n"}]}');
+    expect(out.recommendations[0]).toEqual({ category: 'Suggestion', note: 'n' });
+  });
+
+  it('throws on truly malformed JSON', () => {
+    expect(() => parseReview('not json at all')).toThrow(/Could not parse model response/);
+  });
+
+  it('does not mangle strings containing apostrophes', () => {
+    // Previously the parser tried to "fix" single quotes by mangling all quotes,
+    // which corrupted any string containing an apostrophe. Now it should just throw.
+    const broken = "{'background':\"this isn't valid JSON\",'solution':'s','files':[],'recommendations':[]}";
+    expect(() => parseReview(broken)).toThrow(/Could not parse model response/);
+  });
+});

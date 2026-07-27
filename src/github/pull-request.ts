@@ -1,10 +1,8 @@
 import * as core from '@actions/core';
-import { getOctokit } from '@actions/github';
 import type { ActionInputs } from '../config/types';
 import type { AnnotatedLine, ChangedFile, FetchResult, PullRequestInfo } from '../shared/types';
 import { isExcluded, resolveExcludes } from '../shared/util';
-
-type OctokitLike = ReturnType<typeof getOctokit>;
+import type { OctokitLike } from './types';
 
 export async function fetchPullRequest(
   octokit: OctokitLike,

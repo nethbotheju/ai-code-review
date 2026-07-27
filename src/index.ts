@@ -88,7 +88,8 @@ async function run(): Promise<void> {
     core.info('Posted review.');
     if (commentId) await reactToComment(octokit, owner, repo, commentId, '+1');
   } catch (err) {
-    core.setFailed(`AI code review failed: ${(err as Error).message}`);
+    const e = err as Error;
+    core.setFailed(`AI code review failed: ${e.message}${e.stack ? `\n${e.stack}` : ''}`);
   } finally {
     if (repoRoot) {
       try {

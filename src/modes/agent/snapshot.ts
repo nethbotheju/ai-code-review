@@ -3,9 +3,9 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { x as tarExtract } from 'tar';
 import * as core from '@actions/core';
-import { getOctokit } from '@actions/github';
 import { downloadTarball } from '../../github/contents';
-import { isExcluded, isWithin, resolveExcludes } from '../../shared/util';
+import { isExcluded, resolveExcludes } from '../../shared/util';
+import type { OctokitLike } from '../../github/types';
 import type { ActionInputs, RepoRoot } from '../../config/types';
 
 const MAX_TREE_ENTRIES = 200;
@@ -17,8 +17,6 @@ export class RepoTooLargeError extends Error {
     this.name = 'RepoTooLargeError';
   }
 }
-
-type OctokitLike = ReturnType<typeof getOctokit>;
 
 /**
  * Download and extract a tarball of the repo at a ref (via octokit, so GHE-aware).
@@ -128,26 +126,4 @@ export function buildRepoTree(
   }
 
   return entries.join('\n');
-}
-
-/**
- * Safely resolve a relative path against the repo root.
- * Returns null for absolute paths, traversal escapes, or symlink escapes.
- */
-export function safeResolve(root: string, rel: string): string | null {
-  const normalized = path.normalize(rel).replace(/\\/g, '/');
-  if (path.isAbsolute(normalized)) return null;
-
-  const resolved = path.resolve(root, normalized);
-  if (!isWithin(resolved, root)) return null;
-
-  // Resolve symlinks and confirm the real path stays within the real root.
-  try {
-    const realRoot = fs.realpathSync(root);
-    const realResolved = fs.realpathSync(resolved);
-    if (!isWithin(realResolved, realRoot)) return null;
-  } catch {
-    // Non-existent or broken path — still allow (caller handles missing files).
-  }
-  return resolved;
 }

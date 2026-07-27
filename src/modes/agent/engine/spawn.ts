@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import type { PiEvent } from './types';
+
+const SIGKILL_DELAY_MS = 5000;
 
 /**
  * Spawn the pi CLI, stream its JSONL stdout into parsed events, and resolve on
@@ -16,8 +19,8 @@ export function invokePi(
   return new Promise((resolve, reject) => {
     const events: PiEvent[] = [];
     let stderr = '';
-    let stdoutBuf = '';
     let timedOut = false;
+    let killTimer: NodeJS.Timeout | undefined;
 
     const child = spawn(process.execPath, [cliEntry, ...args], {
       cwd,
@@ -28,28 +31,19 @@ export function invokePi(
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
-      setTimeout(() => {
-        try {
-          child.kill('SIGKILL');
-        } catch {
-          /* already dead */
-        }
-      }, 5000);
+      killTimer = setTimeout(() => {
+        if (!child.killed) child.kill('SIGKILL');
+      }, SIGKILL_DELAY_MS);
     }, timeoutMs);
 
-    child.stdout?.setEncoding('utf-8');
-    child.stdout?.on('data', (chunk: string) => {
-      stdoutBuf += chunk;
-      let nl: number;
-      while ((nl = stdoutBuf.indexOf('\n')) >= 0) {
-        const line = stdoutBuf.slice(0, nl).trim();
-        stdoutBuf = stdoutBuf.slice(nl + 1);
-        if (!line.startsWith('{')) continue;
-        try {
-          events.push(JSON.parse(line) as PiEvent);
-        } catch {
-          /* skip non-JSON lines */
-        }
+    const rl = createInterface({ input: child.stdout!, crlfDelay: Infinity });
+    rl.on('line', (line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('{')) return;
+      try {
+        events.push(JSON.parse(trimmed) as PiEvent);
+      } catch {
+        /* skip non-JSON lines */
       }
     });
 
@@ -60,19 +54,13 @@ export function invokePi(
 
     child.on('error', (err) => {
       clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
       reject(err);
     });
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      const trailing = stdoutBuf.trim();
-      if (trailing.startsWith('{')) {
-        try {
-          events.push(JSON.parse(trailing) as PiEvent);
-        } catch {
-          /* skip */
-        }
-      }
+      if (killTimer) clearTimeout(killTimer);
       if (timedOut) {
         reject(new Error(`pi review timed out after ${timeoutMs}ms.`));
         return;

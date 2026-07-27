@@ -1,7 +1,5 @@
 import * as core from '@actions/core';
-import { getOctokit } from '@actions/github';
-
-type OctokitLike = ReturnType<typeof getOctokit>;
+import type { OctokitLike } from './types';
 
 export interface TarballResult {
   buffer: Buffer;
@@ -20,24 +18,16 @@ export async function downloadTarball(
 ): Promise<TarballResult> {
   const { data, headers } = await octokit.rest.repos.downloadTarballArchive({ owner, repo, ref });
 
-  let buffer: Buffer;
-  if (Buffer.isBuffer(data)) {
-    buffer = data;
-  } else if (data instanceof ArrayBuffer) {
-    buffer = Buffer.from(data);
-  } else if (data instanceof Uint8Array) {
-    buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
-  } else if (typeof data === 'string') {
-    buffer = Buffer.from(data, 'binary');
-  } else {
-    // Stream fallback (should not occur in the Actions Node runtime)
-    buffer = await streamToBuffer(data as NodeJS.ReadableStream);
+  if (!Buffer.isBuffer(data)) {
+    throw new Error(
+      `Expected Buffer from downloadTarballArchive, got ${data?.constructor?.name ?? typeof data}.`,
+    );
   }
 
   const clHeader = (headers as Record<string, string | undefined>)['content-length'];
   const contentLengthMb = clHeader ? Number(clHeader) / (1024 * 1024) : null;
 
-  return { buffer, contentLengthMb };
+  return { buffer: data, contentLengthMb };
 }
 
 /**
@@ -82,12 +72,4 @@ export async function fetchFileContents(
   }
 
   return count === 0 ? '' : parts.join('\n\n');
-}
-
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream as AsyncIterable<Buffer>) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
 }

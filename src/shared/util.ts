@@ -1,15 +1,8 @@
 import { minimatch } from 'minimatch';
-import * as path from 'node:path';
 
 export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max)}…`;
-}
-
-/** Path containment check that is separator-aware (avoids /tmp/foo matching /tmp/foobar). */
-export function isWithin(target: string, base: string): boolean {
-  if (target === base) return true;
-  return target.startsWith(base + path.sep);
 }
 
 export const DEFAULT_EXCLUDES = [

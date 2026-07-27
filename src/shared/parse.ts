@@ -33,16 +33,9 @@ function stripComments(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 }
 
-function normalizeQuotes(text: string): string {
-  return text.replace(/"/g, '\\"').replace(/'/g, '"');
-}
-
 function parseLenient(text: string): unknown {
-  const cleaned = stripComments(stripTrailingCommas(text));
-  const candidates = [text, cleaned];
-  if (cleaned.includes("'")) candidates.push(normalizeQuotes(cleaned));
   let lastError: unknown;
-  for (const candidate of candidates) {
+  for (const candidate of [text, stripComments(stripTrailingCommas(text))]) {
     try {
       return JSON.parse(candidate);
     } catch (err) {
