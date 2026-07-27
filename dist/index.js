@@ -31749,7 +31749,7 @@ function isPiEvent(value) {
         value !== null &&
         typeof value.type === 'string');
 }
-/** Directory where pi is installed. Cacheable by consumers across runs. */
+/** Directory where pi is installed on the runner. */
 function installDir(version) {
     return path.join(os.homedir(), '.cache', 'ai-code-review-pi', version);
 }
@@ -31759,13 +31759,12 @@ function cliEntryPath(version) {
 }
 /**
  * Ensure pi is installed for the given version. Idempotent: skips if the CLI
- * entry already exists (so consumers can cache `~/.cache/ai-code-review-pi`).
- * Returns the absolute path to the bundled CLI entry point.
+ * entry already exists. Returns the absolute path to the bundled CLI entry point.
  */
 async function ensurePiInstalled(version) {
     const entry = cliEntryPath(version);
     if (fs.existsSync(entry)) {
-        core.info(`pi ${version} found at ${installDir(version)} (cached).`);
+        core.info(`pi ${version} found at ${installDir(version)} (already installed).`);
         return entry;
     }
     const dir = installDir(version);

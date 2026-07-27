@@ -181,9 +181,9 @@ headless with read-only tools (`read`, `grep`, `find`, `ls`) to investigate the
 codebase before making recommendations. This uses pi's battle-tested loop
 (compaction, retries, parallel tool execution).
 
-Pi is installed on the runner on first use (`npm install`, ~170MB) and cached
-under `~/.cache/ai-code-review-pi`; cache that path across runs to avoid
-reinstalling. The API key is passed via environment variable (never in argv),
+Pi is installed on the runner via `npm install` (~170MB) on each run; the
+install only takes a few seconds, so no caching is required. The API key is
+passed via environment variable (never in argv),
 `openai-compatible` endpoints are configured via an ephemeral `models.json`, and
 a hard `pi-timeout-ms` guards against runaway loops (pi has no built-in step
 cap). See [`examples/workflow-agent.yml`](./examples/workflow-agent.yml)
