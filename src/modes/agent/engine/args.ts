@@ -1,4 +1,4 @@
-import type { ActionInputs } from '../../config/types';
+import type { ActionInputs } from '../../../config/types';
 import { PI_CUSTOM_API_KEY_ENV } from './constants';
 import { providerFor } from './provider';
 

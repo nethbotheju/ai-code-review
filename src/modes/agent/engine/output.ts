@@ -1,5 +1,5 @@
 import * as core from '@actions/core';
-import type { ReviewResult } from '../../shared/types';
+import type { ReviewResult } from '../../../shared/types';
 import type { PiEvent, PiMessage } from './types';
 
 /** Extract the concatenated text content of a pi message. */

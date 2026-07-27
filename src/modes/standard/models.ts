@@ -1,7 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { LanguageModel } from 'ai';
-import type { ActionInputs } from '../config/types';
+import type { ActionInputs } from '../../config/types';
 
 export function createModel(inputs: ActionInputs): LanguageModel {
   switch (inputs.apiType) {

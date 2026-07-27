@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ActionInputs, ApiType, ReviewMode } from '../../config/types';
+import type { ActionInputs, ApiType, ReviewMode } from '../../../config/types';
 import { buildPiArgs, buildPiEnv } from './args';
 import { PI_CUSTOM_PROVIDER, PI_CUSTOM_API_KEY_ENV } from './constants';
 

@@ -1,4 +1,4 @@
-import type { ActionInputs } from '../../config/types';
+import type { ActionInputs } from '../../../config/types';
 import { PI_CUSTOM_API_KEY_ENV, PI_CUSTOM_PROVIDER } from './constants';
 
 /** Map the action's api-type to a pi provider id. */

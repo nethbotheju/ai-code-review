@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { safeResolve, buildRepoTree, RepoTooLargeError } from './repo-snapshot';
+import { safeResolve, buildRepoTree, RepoTooLargeError } from './snapshot';
 
 function createFixtureDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-test-'));

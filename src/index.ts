@@ -5,13 +5,13 @@ import { resolveTrigger } from './github/trigger';
 import { fetchPullRequest, fetchChangedFiles } from './github/pull-request';
 import { fetchFileContents } from './github/contents';
 import { postReview, reactToComment } from './github/posting';
-import { buildSystemPrompt, buildUserPrompt } from './review/prompt';
-import { parseReview } from './review/parse';
-import { formatNoChanges, formatReview } from './review/format';
-import { runStandardReview } from './review/run';
-import { createModel } from './llm/models';
-import { runPiReview } from './agent/pi';
-import { prepareRepoSnapshot, buildRepoTree, cleanupRepoSnapshot, RepoTooLargeError } from './agent/repo-snapshot';
+import { buildSystemPrompt, buildUserPrompt } from './shared/prompt';
+import { parseReview } from './shared/parse';
+import { formatNoChanges, formatReview } from './shared/format';
+import { runStandardReview } from './modes/standard/runner';
+import { createModel } from './modes/standard/models';
+import { runAgentReview } from './modes/agent/runner';
+import { prepareRepoSnapshot, buildRepoTree, cleanupRepoSnapshot, RepoTooLargeError } from './modes/agent/snapshot';
 import type { ActionInputs, RepoRoot } from './config/types';
 
 async function run(): Promise<void> {
@@ -72,7 +72,7 @@ async function run(): Promise<void> {
 
     // Run review
     const reviewResult = useAgent && repoRoot
-      ? await runPiReview(systemPrompt, userPrompt, repoRoot, inputs)
+      ? await runAgentReview(systemPrompt, userPrompt, repoRoot, inputs)
       : await runStandardReview(createModel(inputs), systemPrompt, userPrompt);
 
     core.info(

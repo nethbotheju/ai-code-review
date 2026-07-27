@@ -4,9 +4,9 @@ import * as os from 'node:os';
 import { x as tarExtract } from 'tar';
 import * as core from '@actions/core';
 import { getOctokit } from '@actions/github';
-import { downloadTarball } from '../github/contents';
-import { isExcluded, isWithin, resolveExcludes } from '../shared/util';
-import type { ActionInputs, RepoRoot } from '../config/types';
+import { downloadTarball } from '../../github/contents';
+import { isExcluded, isWithin, resolveExcludes } from '../../shared/util';
+import type { ActionInputs, RepoRoot } from '../../config/types';
 
 const MAX_TREE_ENTRIES = 200;
 

@@ -45,9 +45,11 @@ Two review modes:
 
 ## Project Structure
 
+The codebase is organized around the two review **modes** (`standard`, `agent`). Each mode lives under `modes/<mode>/` with its own runner; truly cross-cutting concerns live at the top level.
+
 ```
 src/
-  index.ts                   # lightweight orchestrator
+  index.ts                   # entry: resolve inputs → trigger → mode dispatch → post
   config/
     inputs.ts                # action input parsing
     types.ts                 # ActionInputs, ApiType, ReviewMode, RepoRoot
@@ -56,27 +58,27 @@ src/
     pull-request.ts          # fetch PR + changed files + annotate patch diff
     posting.ts               # post review + react to comment (octokit)
     contents.ts              # fetch file contents + tarball (octokit, GHE-aware)
-  llm/
-    models.ts                # createModel factory (OpenAI, OpenAI-compatible, Anthropic)
-  agent/
-    repo-snapshot.ts         # tarball download + extraction + tree builder + safeResolve
-    pi/                      # pi engine — spawn @earendil-works/pi-coding-agent headless
-      index.ts               # runPiReview orchestrator + public re-exports
-      constants.ts           # PI_PACKAGE, PI_CUSTOM_PROVIDER, PI_CUSTOM_API_KEY_ENV
-      types.ts               # PiEvent / PiMessage (JSONL event shapes)
-      provider.ts            # providerFor + buildModelsJson (openai-compatible → models.json)
-      install.ts             # ensurePiInstalled + runNpm (cached npm install)
-      args.ts                # buildPiArgs + buildPiEnv (CLI args + env, key via env)
-      spawn.ts               # invokePi (subprocess + JSONL streaming + timeout)
-      output.ts              # parsePiOutput + messageText (events → ReviewResult)
-  review/
-    run.ts                   # runStandardReview — single-turn generateText
-    prompt.ts                # buildSystemPrompt + buildUserPrompt (both modes)
+  shared/
+    types.ts                 # AnnotatedLine, ChangedFile, ReviewDocument, ReviewResult
+    util.ts                  # truncate, isWithin, isExcluded, resolveExcludes
+    prompt.ts                # buildSystemPrompt + buildUserPrompt (mode-aware addendum)
     parse.ts                 # parseReview — lenient JSON parser for LLM output
     format.ts                # formatReview + formatNoChanges — markdown review body
-  shared/
-    util.ts                  # truncate, isWithin, isExcluded, resolveExcludes
-    types.ts                 # AnnotatedLine, ChangedFile, ReviewDocument, ReviewResult
+  modes/
+    standard/
+      runner.ts              # runStandardReview — single-turn generateText
+      models.ts              # createModel factory (OpenAI, OpenAI-compatible, Anthropic)
+    agent/
+      runner.ts              # runAgentReview — orchestrates snapshot + engine
+      snapshot.ts            # tarball download + extraction + tree builder + safeResolve
+      engine/                # pi subprocess implementation
+        constants.ts         # PI_PACKAGE, PI_CUSTOM_PROVIDER, PI_CUSTOM_API_KEY_ENV
+        types.ts             # PiEvent / PiMessage (JSONL event shapes)
+        provider.ts          # providerFor + buildModelsJson (openai-compatible → models.json)
+        install.ts           # ensurePiInstalled + runNpm (cached npm install)
+        args.ts              # buildPiArgs + buildPiEnv (CLI args + env, key via env)
+        spawn.ts             # invokePi (subprocess + JSONL streaming + timeout)
+        output.ts            # parsePiOutput + messageText (events → ReviewResult)
 ```
 
 ## Key Dependencies
