@@ -14,7 +14,7 @@ export async function runStandardReview(
   const result = await generateText({
     model,
     instructions,
-    messages: [{ role: 'user', content: userMessage }]
+    messages: [{ role: 'user', content: userMessage }],
   });
 
   const usage = result.usage;

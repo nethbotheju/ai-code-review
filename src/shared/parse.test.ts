@@ -3,12 +3,14 @@ import { parseReview } from './parse';
 
 describe('parseReview', () => {
   it('parses a clean JSON object', () => {
-    const out = parseReview(JSON.stringify({
-      background: 'b',
-      solution: 's',
-      files: [{ path: 'a.ts', description: 'd' }],
-      recommendations: [{ category: 'Security', note: 'n' }],
-    }));
+    const out = parseReview(
+      JSON.stringify({
+        background: 'b',
+        solution: 's',
+        files: [{ path: 'a.ts', description: 'd' }],
+        recommendations: [{ category: 'Security', note: 'n' }],
+      }),
+    );
     expect(out).toEqual({
       background: 'b',
       solution: 's',
@@ -18,12 +20,14 @@ describe('parseReview', () => {
   });
 
   it('strips a markdown code fence', () => {
-    const fenced = '```json\n{"background":"b","solution":"s","files":[],"recommendations":[]}\n```';
+    const fenced =
+      '```json\n{"background":"b","solution":"s","files":[],"recommendations":[]}\n```';
     expect(parseReview(fenced).background).toBe('b');
   });
 
   it('extracts JSON from surrounding prose', () => {
-    const wrapped = 'Here is the review:\n{"background":"b","solution":"s","files":[],"recommendations":[]}\nDone.';
+    const wrapped =
+      'Here is the review:\n{"background":"b","solution":"s","files":[],"recommendations":[]}\nDone.';
     expect(parseReview(wrapped).background).toBe('b');
   });
 
@@ -40,8 +44,10 @@ describe('parseReview', () => {
   });
 
   it('strips trailing commas inside arrays and objects', () => {
-    const trailing = '{"background":"b","solution":"s","files":[{"path":"a",},{"path":"b",}],"recommendations":[]}';
-    const trailingObj = '{"background":"b","solution":"s","files":[],"recommendations":[{"note":"n",},]}';
+    const trailing =
+      '{"background":"b","solution":"s","files":[{"path":"a",},{"path":"b",}],"recommendations":[]}';
+    const trailingObj =
+      '{"background":"b","solution":"s","files":[],"recommendations":[{"note":"n",},]}';
     expect(parseReview(trailing).files).toEqual([
       { path: 'a', description: '' },
       { path: 'b', description: '' },
@@ -56,12 +62,16 @@ describe('parseReview', () => {
   });
 
   it('skips files with empty path', () => {
-    const out = parseReview('{"background":"b","solution":"s","files":[{"path":"","description":"d"},{"path":"x","description":"y"}],"recommendations":[]}');
+    const out = parseReview(
+      '{"background":"b","solution":"s","files":[{"path":"","description":"d"},{"path":"x","description":"y"}],"recommendations":[]}',
+    );
     expect(out.files).toEqual([{ path: 'x', description: 'y' }]);
   });
 
   it('substitutes "Suggestion" for missing recommendation category', () => {
-    const out = parseReview('{"background":"b","solution":"s","files":[],"recommendations":[{"note":"n"}]}');
+    const out = parseReview(
+      '{"background":"b","solution":"s","files":[],"recommendations":[{"note":"n"}]}',
+    );
     expect(out.recommendations[0]).toEqual({ category: 'Suggestion', note: 'n' });
   });
 
@@ -72,7 +82,8 @@ describe('parseReview', () => {
   it('does not mangle strings containing apostrophes', () => {
     // Previously the parser tried to "fix" single quotes by mangling all quotes,
     // which corrupted any string containing an apostrophe. Now it should just throw.
-    const broken = "{'background':\"this isn't valid JSON\",'solution':'s','files':[],'recommendations':[]}";
+    const broken =
+      "{'background':\"this isn't valid JSON\",'solution':'s','files':[],'recommendations':[]}";
     expect(() => parseReview(broken)).toThrow(/Could not parse model response/);
   });
 });

@@ -43,14 +43,23 @@ export async function ensurePiInstalled(version: string): Promise<string> {
   return entry;
 }
 
-/** Run an npm command in `cwd`. Version is validated upstream; npm resolves via PATH on the Linux runner. */
+/** Run an npm command in `cwd`. Streams stdout live; captures stderr to include in the failure message. */
 export function runNpm(args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npm', args, { cwd, stdio: 'inherit' });
+    let stderr = '';
+    const child = spawn('npm', args, { cwd, stdio: ['inherit', 'inherit', 'pipe'] });
+    child.stderr?.setEncoding('utf-8');
+    child.stderr?.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
     child.on('error', reject);
     child.on('close', (code) => {
-      if (code !== 0) reject(new Error(`npm ${args.join(' ')} exited with code ${code}`));
-      else resolve();
+      if (code !== 0) {
+        const tail = stderr.length > 4000 ? `…${stderr.slice(-4000)}` : stderr;
+        reject(new Error(`npm ${args.join(' ')} exited with code ${code}.\nstderr:\n${tail}`));
+      } else {
+        resolve();
+      }
     });
   });
 }

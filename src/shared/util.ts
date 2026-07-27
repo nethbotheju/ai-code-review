@@ -33,9 +33,7 @@ export const DEFAULT_EXCLUDES = [
 // Also tests with a trailing slash so `**/node_modules/**` matches the bare dir.
 export function isExcluded(filePath: string, patterns: string[]): boolean {
   return patterns.some(
-    (p) =>
-      minimatch(filePath, p, { matchBase: true, dot: true }) ||
-      minimatch(filePath + '/', p, { matchBase: true, dot: true })
+    (p) => minimatch(filePath, p, { dot: true }) || minimatch(filePath + '/', p, { dot: true }),
   );
 }
 

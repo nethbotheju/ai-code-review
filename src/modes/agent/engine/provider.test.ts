@@ -32,9 +32,9 @@ describe('providerFor', () => {
   });
 
   it('maps openai-compatible to the custom provider id', () => {
-    expect(
-      providerFor(makeInputs({ apiType: 'openai-compatible', baseUrl: 'https://x/v1' })),
-    ).toBe(PI_CUSTOM_PROVIDER);
+    expect(providerFor(makeInputs({ apiType: 'openai-compatible', baseUrl: 'https://x/v1' }))).toBe(
+      PI_CUSTOM_PROVIDER,
+    );
   });
 });
 

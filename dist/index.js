@@ -31588,26 +31588,36 @@ exports.buildPiArgs = buildPiArgs;
 exports.buildPiEnv = buildPiEnv;
 const constants_1 = __nccwpck_require__(8896);
 const provider_1 = __nccwpck_require__(3880);
+/** Headless, ephemeral, read-only flags. Reused across runs and asserted by tests. */
+const PI_FLAGS = [
+    '-p', // print mode: process the prompt and exit
+    '--no-session', // ephemeral; never persist
+    '--mode',
+    'json', // JSONL event stream on stdout
+    '--offline', // no startup network (update checks / telemetry) — does not block the model call
+    '--thinking',
+    'off', // cost control
+    '--no-extensions',
+    '--no-skills',
+    '--no-prompt-templates',
+    '--no-context-files',
+    '--no-themes',
+    '--tools',
+    'read,grep,find,ls', // read-only investigation tools (no bash/edit/write)
+];
 /**
  * Build the pi CLI args for a headless read-only review run.
  * Assumes models.json (for compatible) has already been written to the config dir.
  */
 function buildPiArgs(systemPrompt, userPrompt, inputs) {
     return [
-        '-p', // print mode: process the prompt and exit
-        '--no-session', // ephemeral; never persist
-        '--mode', 'json', // JSONL event stream on stdout
-        '--offline', // no startup network (update checks / telemetry) — does not block the model call
-        '--thinking', 'off', // cost control
-        '--no-extensions',
-        '--no-skills',
-        '--no-prompt-templates',
-        '--no-context-files',
-        '--no-themes',
-        '--tools', 'read,grep,find,ls', // read-only investigation tools (no bash/edit/write)
-        '--system-prompt', systemPrompt,
-        '--provider', (0, provider_1.providerFor)(inputs),
-        '--model', inputs.model,
+        ...PI_FLAGS,
+        '--system-prompt',
+        systemPrompt,
+        '--provider',
+        (0, provider_1.providerFor)(inputs),
+        '--model',
+        inputs.model,
         userPrompt,
     ];
 }
@@ -31728,16 +31738,24 @@ async function ensurePiInstalled(version) {
     core.info('pi installed.');
     return entry;
 }
-/** Run an npm command in `cwd`. Version is validated upstream; npm resolves via PATH on the Linux runner. */
+/** Run an npm command in `cwd`. Streams stdout live; captures stderr to include in the failure message. */
 function runNpm(args, cwd) {
     return new Promise((resolve, reject) => {
-        const child = (0, node_child_process_1.spawn)('npm', args, { cwd, stdio: 'inherit' });
+        let stderr = '';
+        const child = (0, node_child_process_1.spawn)('npm', args, { cwd, stdio: ['inherit', 'inherit', 'pipe'] });
+        child.stderr?.setEncoding('utf-8');
+        child.stderr?.on('data', (chunk) => {
+            stderr += chunk;
+        });
         child.on('error', reject);
         child.on('close', (code) => {
-            if (code !== 0)
-                reject(new Error(`npm ${args.join(' ')} exited with code ${code}`));
-            else
+            if (code !== 0) {
+                const tail = stderr.length > 4000 ? `…${stderr.slice(-4000)}` : stderr;
+                reject(new Error(`npm ${args.join(' ')} exited with code ${code}.\nstderr:\n${tail}`));
+            }
+            else {
                 resolve();
+            }
         });
     });
 }
@@ -31913,15 +31931,54 @@ function buildModelsJson(inputs) {
 /***/ }),
 
 /***/ 8194:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.invokePi = invokePi;
 const node_child_process_1 = __nccwpck_require__(1421);
+const core = __importStar(__nccwpck_require__(7484));
 const node_readline_1 = __nccwpck_require__(481);
 const SIGKILL_DELAY_MS = 5000;
+function isPiEvent(value) {
+    return (typeof value === 'object' &&
+        value !== null &&
+        typeof value.type === 'string');
+}
 /**
  * Spawn the pi CLI, stream its JSONL stdout into parsed events, and resolve on
  * completion. Enforces a hard timeout (SIGTERM then SIGKILL). Rejects if the
@@ -31952,7 +32009,9 @@ function invokePi(cliEntry, args, cwd, env, timeoutMs) {
             if (!trimmed.startsWith('{'))
                 return;
             try {
-                events.push(JSON.parse(trimmed));
+                const parsed = JSON.parse(trimmed);
+                if (isPiEvent(parsed))
+                    events.push(parsed);
             }
             catch {
                 /* skip non-JSON lines */
@@ -31976,9 +32035,13 @@ function invokePi(cliEntry, args, cwd, env, timeoutMs) {
                 reject(new Error(`pi review timed out after ${timeoutMs}ms.`));
                 return;
             }
-            if (code !== 0 && events.length === 0) {
-                reject(new Error(`pi exited with code ${code} and produced no output.\nstderr:\n${stderr.slice(0, 2000)}`));
-                return;
+            if (code !== 0) {
+                if (events.length === 0) {
+                    reject(new Error(`pi exited with code ${code} and produced no output.\nstderr:\n${stderr.slice(0, 2000)}`));
+                }
+                else {
+                    core.warning(`pi exited with code ${code} but produced ${events.length} event(s); using partial output.`);
+                }
             }
             resolve({ events, stderr });
         });
@@ -32185,7 +32248,8 @@ function buildRepoTree(root, inputs, maxEntries = MAX_TREE_ENTRIES) {
         try {
             names = fs.readdirSync(dir);
         }
-        catch {
+        catch (err) {
+            core.debug(`Skipping unreadable directory ${dir}: ${err.message}`);
             return;
         }
         names.sort();
@@ -32278,7 +32342,7 @@ async function runStandardReview(model, instructions, userMessage) {
     const result = await (0, ai_1.generateText)({
         model,
         instructions,
-        messages: [{ role: 'user', content: userMessage }]
+        messages: [{ role: 'user', content: userMessage }],
     });
     const usage = result.usage;
     return {
@@ -32601,8 +32665,7 @@ exports.DEFAULT_EXCLUDES = [
 // Test a path against glob exclude patterns.
 // Also tests with a trailing slash so `**/node_modules/**` matches the bare dir.
 function isExcluded(filePath, patterns) {
-    return patterns.some((p) => (0, minimatch_1.minimatch)(filePath, p, { matchBase: true, dot: true }) ||
-        (0, minimatch_1.minimatch)(filePath + '/', p, { matchBase: true, dot: true }));
+    return patterns.some((p) => (0, minimatch_1.minimatch)(filePath, p, { dot: true }) || (0, minimatch_1.minimatch)(filePath + '/', p, { dot: true }));
 }
 /** Resolve the full exclude list (defaults + user patterns) for a given inputs config. */
 function resolveExcludes(opts) {

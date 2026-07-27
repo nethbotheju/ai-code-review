@@ -13,7 +13,9 @@ const MAX_TREE_ENTRIES = 200;
 /** Error thrown when the repo tarball exceeds the configured max size. */
 export class RepoTooLargeError extends Error {
   constructor(sizeMb: number, maxMb: number) {
-    super(`Repo tarball is ${sizeMb}MB, exceeding the ${maxMb}MB limit. Agent mode degraded to standard.`);
+    super(
+      `Repo tarball is ${sizeMb}MB, exceeding the ${maxMb}MB limit. Agent mode degraded to standard.`,
+    );
     this.name = 'RepoTooLargeError';
   }
 }
@@ -86,7 +88,8 @@ export function buildRepoTree(
     let names: string[];
     try {
       names = fs.readdirSync(dir);
-    } catch {
+    } catch (err) {
+      core.debug(`Skipping unreadable directory ${dir}: ${(err as Error).message}`);
       return;
     }
 

@@ -1,8 +1,17 @@
 import { spawn } from 'node:child_process';
+import * as core from '@actions/core';
 import { createInterface } from 'node:readline';
 import type { PiEvent } from './types';
 
 const SIGKILL_DELAY_MS = 5000;
+
+function isPiEvent(value: unknown): value is PiEvent {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { type?: unknown }).type === 'string'
+  );
+}
 
 /**
  * Spawn the pi CLI, stream its JSONL stdout into parsed events, and resolve on
@@ -41,7 +50,8 @@ export function invokePi(
       const trimmed = line.trim();
       if (!trimmed.startsWith('{')) return;
       try {
-        events.push(JSON.parse(trimmed) as PiEvent);
+        const parsed: unknown = JSON.parse(trimmed);
+        if (isPiEvent(parsed)) events.push(parsed);
       } catch {
         /* skip non-JSON lines */
       }
@@ -65,13 +75,18 @@ export function invokePi(
         reject(new Error(`pi review timed out after ${timeoutMs}ms.`));
         return;
       }
-      if (code !== 0 && events.length === 0) {
-        reject(
-          new Error(
-            `pi exited with code ${code} and produced no output.\nstderr:\n${stderr.slice(0, 2000)}`,
-          ),
-        );
-        return;
+      if (code !== 0) {
+        if (events.length === 0) {
+          reject(
+            new Error(
+              `pi exited with code ${code} and produced no output.\nstderr:\n${stderr.slice(0, 2000)}`,
+            ),
+          );
+        } else {
+          core.warning(
+            `pi exited with code ${code} but produced ${events.length} event(s); using partial output.`,
+          );
+        }
       }
       resolve({ events, stderr });
     });

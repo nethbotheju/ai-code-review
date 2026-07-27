@@ -9,7 +9,7 @@ export async function postReview(
   pullNumber: number,
   headSha: string,
   body: string,
-  comments: ReviewComment[]
+  comments: ReviewComment[],
 ): Promise<void> {
   await octokit.rest.pulls.createReview({
     owner,
@@ -32,7 +32,7 @@ export async function reactToComment(
   owner: string,
   repo: string,
   commentId: number,
-  content: 'eyes' | '+1' | 'rocket'
+  content: 'eyes' | '+1' | 'rocket',
 ): Promise<void> {
   try {
     await octokit.rest.reactions.createForIssueComment({

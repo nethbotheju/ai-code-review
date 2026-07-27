@@ -4,7 +4,7 @@ import { getInputs } from './inputs';
 const REQUIRED: Record<string, string> = {
   'INPUT_API-TYPE': 'openai',
   'INPUT_API-KEY': 'sk-test',
-  'INPUT_MODEL': 'gpt-4o',
+  INPUT_MODEL: 'gpt-4o',
   'INPUT_GITHUB-TOKEN': 'ghp_test',
 };
 

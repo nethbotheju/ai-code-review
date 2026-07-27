@@ -11,7 +11,12 @@ import { formatNoChanges, formatReview } from './shared/format';
 import { runStandardReview } from './modes/standard/runner';
 import { createModel } from './modes/standard/models';
 import { runAgentReview } from './modes/agent/runner';
-import { prepareRepoSnapshot, buildRepoTree, cleanupRepoSnapshot, RepoTooLargeError } from './modes/agent/snapshot';
+import {
+  prepareRepoSnapshot,
+  buildRepoTree,
+  cleanupRepoSnapshot,
+  RepoTooLargeError,
+} from './modes/agent/snapshot';
 import type { ActionInputs, RepoRoot } from './config/types';
 
 async function run(): Promise<void> {
@@ -43,17 +48,30 @@ async function run(): Promise<void> {
       return;
     }
 
-    const contextDocs = await fetchFileContents(octokit, owner, repo, pr.headSha, inputs.contextDocs, {
-      maxBytes: 10000,
-      maxFiles: 3,
-    });
+    const contextDocs = await fetchFileContents(
+      octokit,
+      owner,
+      repo,
+      pr.headSha,
+      inputs.contextDocs,
+      {
+        maxBytes: 10000,
+        maxFiles: 3,
+      },
+    );
 
     // Whether we actually run agent mode (may degrade if tarball is too large)
     let useAgent = inputs.reviewMode === 'agent';
 
     if (useAgent) {
       try {
-        repoRoot = await prepareRepoSnapshot(octokit, owner, repo, pr.headSha, inputs.agentTarballMaxMb);
+        repoRoot = await prepareRepoSnapshot(
+          octokit,
+          owner,
+          repo,
+          pr.headSha,
+          inputs.agentTarballMaxMb,
+        );
       } catch (err) {
         if (err instanceof RepoTooLargeError) {
           core.warning(err.message);
@@ -71,9 +89,10 @@ async function run(): Promise<void> {
     const userPrompt = buildUserPrompt(pr, fetchResult.files, { docs: contextDocs, tree });
 
     // Run review
-    const reviewResult = useAgent && repoRoot
-      ? await runAgentReview(systemPrompt, userPrompt, repoRoot, inputs)
-      : await runStandardReview(createModel(inputs), systemPrompt, userPrompt);
+    const reviewResult =
+      useAgent && repoRoot
+        ? await runAgentReview(systemPrompt, userPrompt, repoRoot, inputs)
+        : await runStandardReview(createModel(inputs), systemPrompt, userPrompt);
 
     core.info(
       `Review done. tokens in=${reviewResult.inputTokens} out=${reviewResult.outputTokens} tot=${reviewResult.totalTokens} steps=${reviewResult.steps}`,

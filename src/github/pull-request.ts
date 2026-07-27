@@ -8,7 +8,7 @@ export async function fetchPullRequest(
   octokit: OctokitLike,
   owner: string,
   repo: string,
-  pullNumber: number
+  pullNumber: number,
 ): Promise<PullRequestInfo> {
   const { data } = await octokit.rest.pulls.get({ owner, repo, pull_number: pullNumber });
   return {
@@ -24,7 +24,7 @@ export async function fetchChangedFiles(
   owner: string,
   repo: string,
   pullNumber: number,
-  inputs: ActionInputs
+  inputs: ActionInputs,
 ): Promise<FetchResult> {
   const all = await octokit.paginate(octokit.rest.pulls.listFiles, {
     owner,
@@ -72,7 +72,7 @@ export async function fetchChangedFiles(
   }));
 
   core.info(
-    `Found ${all.length} changed file(s); ${candidates.length} reviewable; reviewing ${files.length}.`
+    `Found ${all.length} changed file(s); ${candidates.length} reviewable; reviewing ${files.length}.`,
   );
 
   return {

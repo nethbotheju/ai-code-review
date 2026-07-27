@@ -27,7 +27,9 @@ function parseIntInput(name: string, fallback: number): number {
 export function getInputs(): ActionInputs {
   const apiTypeRaw = core.getInput('api-type', { required: true }).trim();
   if (!VALID_API_TYPES.has(apiTypeRaw as ApiType)) {
-    throw new Error(`Invalid api-type '${apiTypeRaw}'. Must be one of: ${[...VALID_API_TYPES].join(', ')}`);
+    throw new Error(
+      `Invalid api-type '${apiTypeRaw}'. Must be one of: ${[...VALID_API_TYPES].join(', ')}`,
+    );
   }
   const apiType = apiTypeRaw as ApiType;
 
@@ -51,7 +53,9 @@ export function getInputs(): ActionInputs {
 
   const reviewModeRaw = core.getInput('review-mode').trim().toLowerCase() || 'standard';
   if (!VALID_REVIEW_MODES.has(reviewModeRaw as ReviewMode)) {
-    throw new Error(`Invalid review-mode '${reviewModeRaw}'. Must be one of: ${[...VALID_REVIEW_MODES].join(', ')}`);
+    throw new Error(
+      `Invalid review-mode '${reviewModeRaw}'. Must be one of: ${[...VALID_REVIEW_MODES].join(', ')}`,
+    );
   }
   const reviewMode = reviewModeRaw as ReviewMode;
 
@@ -83,7 +87,8 @@ export function getInputs(): ActionInputs {
     extraInstructions,
     reviewMode,
     agentTarballMaxMb,
-    contextDocs: contextDocs.length > 0 ? contextDocs : ['AGENTS.md', '.ai-review.md', 'CONTRIBUTING.md'],
+    contextDocs:
+      contextDocs.length > 0 ? contextDocs : ['AGENTS.md', '.ai-review.md', 'CONTRIBUTING.md'],
     piVersion,
     piTimeoutMs,
   };

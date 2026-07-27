@@ -44,7 +44,7 @@ function parseLenient(text: string): unknown {
   }
   const preview = text.length > 400 ? `${text.slice(0, 400)}…` : text;
   throw new Error(
-    `Could not parse model response as JSON (${(lastError as Error).message}). Model response was:\n${preview}`
+    `Could not parse model response as JSON (${(lastError as Error).message}). Model response was:\n${preview}`,
   );
 }
 
@@ -74,7 +74,8 @@ function asRecommendations(value: unknown): Recommendation[] {
       const r = item as Record<string, unknown>;
       const note = typeof r.note === 'string' ? r.note.trim() : '';
       if (!note) return null;
-      const category = typeof r.category === 'string' && r.category.trim() ? r.category.trim() : 'Suggestion';
+      const category =
+        typeof r.category === 'string' && r.category.trim() ? r.category.trim() : 'Suggestion';
       return { category, note };
     })
     .filter((x): x is Recommendation => x !== null);
