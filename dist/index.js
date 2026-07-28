@@ -31673,7 +31673,7 @@ function parsePiOutput(events) {
             inputTokens += inT;
             outputTokens += outT;
             // Some providers (e.g. Anthropic, DeepSeek) omit usage.total; derive it.
-            totalTokens += m.usage.total ?? (inT + outT);
+            totalTokens += m.usage.total ?? inT + outT;
             counted = true;
         }
     }

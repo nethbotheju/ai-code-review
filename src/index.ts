@@ -92,7 +92,12 @@ async function run(): Promise<void> {
     const systemPrompt = useAgent
       ? buildAgentSystemPrompt(promptInputs)
       : buildSystemPrompt(promptInputs);
-    const userPrompt = buildUserPrompt(pr, fetchResult.files, { docs: contextDocs, tree }, useAgent);
+    const userPrompt = buildUserPrompt(
+      pr,
+      fetchResult.files,
+      { docs: contextDocs, tree },
+      useAgent,
+    );
 
     // Run review
     const reviewResult =
