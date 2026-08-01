@@ -115,13 +115,13 @@ describe('getInputs', () => {
     }
   });
 
-  it('requires base-url for openai-compatible', () => {
-    setEnv({ 'INPUT_API-TYPE': 'openai-compatible' });
+  it('requires base-url for openai-chat-compatible', () => {
+    setEnv({ 'INPUT_API-TYPE': 'openai-chat-compatible' });
     expect(() => getInputs()).toThrow(/base-url.*required/);
   });
 
-  it('accepts base-url for openai-compatible', () => {
-    setEnv({ 'INPUT_API-TYPE': 'openai-compatible', 'INPUT_BASE-URL': 'https://x/v1' });
+  it('accepts base-url for openai-chat-compatible', () => {
+    setEnv({ 'INPUT_API-TYPE': 'openai-chat-compatible', 'INPUT_BASE-URL': 'https://x/v1' });
     expect(getInputs().baseUrl).toBe('https://x/v1');
   });
 });

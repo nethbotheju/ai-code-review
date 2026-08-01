@@ -48,7 +48,7 @@ jobs:
       - uses: nethbotheju/ai-code-review@v1
         with:
           github-token: ${{ steps.app-token.outputs.token }}
-          api-type: openai            # openai | openai-compatible | anthropic
+          api-type: openai            # openai | openai-chat-compatible | anthropic
           model: gpt-4o
           api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
           # auto-review: 'true'
