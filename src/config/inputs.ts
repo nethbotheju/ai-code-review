@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import type { ActionInputs, ApiType, ReviewMode } from './types';
 
-const VALID_API_TYPES = new Set<ApiType>(['openai', 'openai-compatible', 'anthropic']);
+const VALID_API_TYPES = new Set<ApiType>(['openai', 'openai-chat-compatible', 'anthropic']);
 const VALID_REVIEW_MODES = new Set<ReviewMode>(['standard', 'agent']);
 const DEFAULT_PI_VERSION = '0.82.1';
 // Injection-safe version spec (semver, prerelease, dist-tag). No spaces/shell metachars.
@@ -36,8 +36,8 @@ export function getInputs(): ActionInputs {
   const apiKey = core.getInput('api-key', { required: true });
   const baseUrl = core.getInput('base-url').trim() || undefined;
 
-  if (apiType === 'openai-compatible' && !baseUrl) {
-    throw new Error("'base-url' is required when api-type is 'openai-compatible'.");
+  if (apiType === 'openai-chat-compatible' && !baseUrl) {
+    throw new Error("'base-url' is required when api-type is 'openai-chat-compatible'.");
   }
 
   const model = core.getInput('model', { required: true });

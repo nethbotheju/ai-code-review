@@ -3,7 +3,7 @@ import type { ActionInputs } from '../../config/types';
 /** npm package name, used to install pi on the runner at runtime. */
 export const PI_PACKAGE = '@earendil-works/pi-coding-agent';
 
-/** Provider id registered in models.json for openai-compatible endpoints. */
+/** Provider id registered in models.json for openai-chat-compatible endpoints. */
 export const PI_CUSTOM_PROVIDER = 'custom';
 
 /** Env var referenced by models.json ($ interpolation) for the compatible key. */
@@ -34,7 +34,7 @@ export function providerFor(inputs: ActionInputs): string {
       return 'anthropic';
     case 'openai':
       return 'openai';
-    case 'openai-compatible':
+    case 'openai-chat-compatible':
       return PI_CUSTOM_PROVIDER;
     default: {
       const _exhaustive: never = inputs.apiType;
@@ -44,13 +44,13 @@ export function providerFor(inputs: ActionInputs): string {
 }
 
 /**
- * Build the models.json content for an openai-compatible endpoint. The key is
+ * Build the models.json content for an openai-chat-compatible endpoint. The key is
  * referenced via env interpolation ($CUSTOM_API_KEY) so it never
  * appears in argv or on disk in plaintext beyond the process env.
  */
 export function buildModelsJson(inputs: ActionInputs): Record<string, unknown> {
-  if (inputs.apiType !== 'openai-compatible') {
-    throw new Error('buildModelsJson is only for openai-compatible.');
+  if (inputs.apiType !== 'openai-chat-compatible') {
+    throw new Error('buildModelsJson is only for openai-chat-compatible.');
   }
   return {
     providers: {

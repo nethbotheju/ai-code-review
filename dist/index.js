@@ -30982,7 +30982,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getInputs = getInputs;
 const core = __importStar(__nccwpck_require__(7484));
-const VALID_API_TYPES = new Set(['openai', 'openai-compatible', 'anthropic']);
+const VALID_API_TYPES = new Set(['openai', 'openai-chat-compatible', 'anthropic']);
 const VALID_REVIEW_MODES = new Set(['standard', 'agent']);
 const DEFAULT_PI_VERSION = '0.82.1';
 // Injection-safe version spec (semver, prerelease, dist-tag). No spaces/shell metachars.
@@ -31011,8 +31011,8 @@ function getInputs() {
     const apiType = apiTypeRaw;
     const apiKey = core.getInput('api-key', { required: true });
     const baseUrl = core.getInput('base-url').trim() || undefined;
-    if (apiType === 'openai-compatible' && !baseUrl) {
-        throw new Error("'base-url' is required when api-type is 'openai-compatible'.");
+    if (apiType === 'openai-chat-compatible' && !baseUrl) {
+        throw new Error("'base-url' is required when api-type is 'openai-chat-compatible'.");
     }
     const model = core.getInput('model', { required: true });
     const githubToken = core.getInput('github-token', { required: true });
@@ -31474,7 +31474,7 @@ exports.buildPiArgs = buildPiArgs;
 exports.buildPiEnv = buildPiEnv;
 /** npm package name, used to install pi on the runner at runtime. */
 exports.PI_PACKAGE = '@earendil-works/pi-coding-agent';
-/** Provider id registered in models.json for openai-compatible endpoints. */
+/** Provider id registered in models.json for openai-chat-compatible endpoints. */
 exports.PI_CUSTOM_PROVIDER = 'custom';
 /** Env var referenced by models.json ($ interpolation) for the compatible key. */
 exports.PI_CUSTOM_API_KEY_ENV = 'CUSTOM_API_KEY';
@@ -31502,7 +31502,7 @@ function providerFor(inputs) {
             return 'anthropic';
         case 'openai':
             return 'openai';
-        case 'openai-compatible':
+        case 'openai-chat-compatible':
             return exports.PI_CUSTOM_PROVIDER;
         default: {
             const _exhaustive = inputs.apiType;
@@ -31511,13 +31511,13 @@ function providerFor(inputs) {
     }
 }
 /**
- * Build the models.json content for an openai-compatible endpoint. The key is
+ * Build the models.json content for an openai-chat-compatible endpoint. The key is
  * referenced via env interpolation ($CUSTOM_API_KEY) so it never
  * appears in argv or on disk in plaintext beyond the process env.
  */
 function buildModelsJson(inputs) {
-    if (inputs.apiType !== 'openai-compatible') {
-        throw new Error('buildModelsJson is only for openai-compatible.');
+    if (inputs.apiType !== 'openai-chat-compatible') {
+        throw new Error('buildModelsJson is only for openai-chat-compatible.');
     }
     return {
         providers: {
@@ -31919,14 +31919,14 @@ const pi_process_1 = __nccwpck_require__(7603);
 const pi_output_1 = __nccwpck_require__(7269);
 /**
  * Run the agent-mode review: install the pi subprocess, write an ephemeral
- * config dir (models.json for openai-compatible), spawn the CLI against the
+ * config dir (models.json for openai-chat-compatible), spawn the CLI against the
  * repo snapshot, and parse its JSONL event stream into a ReviewResult.
  */
 async function runAgentReview(systemPrompt, userPrompt, repoRoot, inputs) {
     const cliEntry = await (0, pi_process_1.ensurePiInstalled)(inputs.piVersion);
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-config-'));
     try {
-        if (inputs.apiType === 'openai-compatible') {
+        if (inputs.apiType === 'openai-chat-compatible') {
             fs.writeFileSync(path.join(configDir, 'models.json'), JSON.stringify((0, pi_args_1.buildModelsJson)(inputs), null, 2));
         }
         const args = (0, pi_args_1.buildPiArgs)(systemPrompt, userPrompt, inputs);
@@ -32122,12 +32122,12 @@ function createModel(inputs) {
             const factory = (0, openai_1.createOpenAI)({ apiKey: inputs.apiKey });
             return factory(inputs.model);
         }
-        case 'openai-compatible': {
+        case 'openai-chat-compatible': {
             if (!inputs.baseUrl) {
-                throw new Error("'base-url' is required when api-type is 'openai-compatible'.");
+                throw new Error("'base-url' is required when api-type is 'openai-chat-compatible'.");
             }
             const factory = (0, openai_1.createOpenAI)({ apiKey: inputs.apiKey, baseURL: inputs.baseUrl });
-            return factory(inputs.model);
+            return factory.chat(inputs.model);
         }
         case 'anthropic': {
             const factory = (0, anthropic_1.createAnthropic)({ apiKey: inputs.apiKey });

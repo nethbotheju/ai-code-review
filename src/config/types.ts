@@ -1,6 +1,6 @@
 /** Action configuration types + agent runtime types. */
 
-export type ApiType = 'openai' | 'openai-compatible' | 'anthropic';
+export type ApiType = 'openai' | 'openai-chat-compatible' | 'anthropic';
 export type ReviewMode = 'standard' | 'agent';
 
 export interface ActionInputs {

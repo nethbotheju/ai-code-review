@@ -9,12 +9,12 @@ export function createModel(inputs: ActionInputs): LanguageModel {
       const factory = createOpenAI({ apiKey: inputs.apiKey });
       return factory(inputs.model);
     }
-    case 'openai-compatible': {
+    case 'openai-chat-compatible': {
       if (!inputs.baseUrl) {
-        throw new Error("'base-url' is required when api-type is 'openai-compatible'.");
+        throw new Error("'base-url' is required when api-type is 'openai-chat-compatible'.");
       }
       const factory = createOpenAI({ apiKey: inputs.apiKey, baseURL: inputs.baseUrl });
-      return factory(inputs.model);
+      return factory.chat(inputs.model);
     }
     case 'anthropic': {
       const factory = createAnthropic({ apiKey: inputs.apiKey });

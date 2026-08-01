@@ -74,7 +74,7 @@ src/
       engine/                # pi subprocess implementation
         constants.ts         # PI_PACKAGE, PI_CUSTOM_PROVIDER, PI_CUSTOM_API_KEY_ENV
         types.ts             # PiEvent / PiMessage (JSONL event shapes)
-        provider.ts          # providerFor + buildModelsJson (openai-compatible → models.json)
+        provider.ts          # providerFor + buildModelsJson (openai-chat-compatible → models.json)
         install.ts           # ensurePiInstalled + runNpm
         args.ts              # buildPiArgs + buildPiEnv (CLI args + env, key via env)
         spawn.ts             # invokePi (subprocess + JSONL streaming + timeout)
@@ -96,7 +96,7 @@ src/
 - Agent mode downloads the full repo as a tarball via octokit (`github/contents.ts`)
 - Extracts to a temp dir and spawns `@earendil-works/pi-coding-agent` headless against it
 - pi runs with read-only tools (`read`, `grep`, `find`, `ls`) — no shell, no write, no network exfiltration
-- The API key is injected via environment variable (never argv); `openai-compatible` endpoints are configured via an ephemeral `models.json` (`agent/pi/provider.ts`)
+- The API key is injected via environment variable (never argv); `openai-chat-compatible` endpoints are configured via an ephemeral `models.json` (`agent/pi/provider.ts`)
 - pi is installed on each run into `~/.cache/ai-code-review-pi/<version>` (`npm install`, a few seconds); `pi-version` controls the version, `pi-timeout-ms` is the hard kill timeout (pi has no built-in step cap)
 - pi emits a JSONL event stream (`--mode json`) which `agent/pi/output.ts` parses into a `ReviewResult`
 - Tarball too large → auto-degrades to standard mode

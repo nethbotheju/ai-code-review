@@ -40,10 +40,10 @@ describe('providerFor', () => {
     expect(providerFor(makeInputs({ apiType: 'openai' }))).toBe('openai');
   });
 
-  it('maps openai-compatible to the custom provider id', () => {
-    expect(providerFor(makeInputs({ apiType: 'openai-compatible', baseUrl: 'https://x/v1' }))).toBe(
-      PI_CUSTOM_PROVIDER,
-    );
+  it('maps openai-chat-compatible to the custom provider id', () => {
+    expect(
+      providerFor(makeInputs({ apiType: 'openai-chat-compatible', baseUrl: 'https://x/v1' })),
+    ).toBe(PI_CUSTOM_PROVIDER);
   });
 });
 
@@ -51,7 +51,7 @@ describe('buildModelsJson', () => {
   it('builds an openai-completions provider referencing the env key', () => {
     const json = buildModelsJson(
       makeInputs({
-        apiType: 'openai-compatible',
+        apiType: 'openai-chat-compatible',
         apiKey: 'sk-x',
         baseUrl: 'https://gw.example.com/v1',
         model: 'my-model',
@@ -70,7 +70,7 @@ describe('buildModelsJson', () => {
 
   it('opts out of developer role and reasoning knobs for max compatibility', () => {
     const json = buildModelsJson(
-      makeInputs({ apiType: 'openai-compatible', baseUrl: 'https://x/v1' }),
+      makeInputs({ apiType: 'openai-chat-compatible', baseUrl: 'https://x/v1' }),
     ) as { providers: Record<string, { compat: Record<string, unknown> }> };
     const compat = json.providers[PI_CUSTOM_PROVIDER]?.compat as
       Record<string, unknown> | undefined;
@@ -104,11 +104,11 @@ describe('buildPiArgs', () => {
     expect(args[args.length - 1]).toBe(USER);
   });
 
-  it('uses the compatible provider id for openai-compatible', () => {
+  it('uses the compatible provider id for openai-chat-compatible', () => {
     const args = buildPiArgs(
       SYSTEM,
       USER,
-      makeInputs({ apiType: 'openai-compatible', baseUrl: 'https://x/v1' }),
+      makeInputs({ apiType: 'openai-chat-compatible', baseUrl: 'https://x/v1' }),
     );
     expect(args[args.indexOf('--provider') + 1]).toBe(PI_CUSTOM_PROVIDER);
   });
@@ -126,9 +126,9 @@ describe('buildPiEnv', () => {
     expect(env.OPENAI_API_KEY).toBe('sk-openai');
   });
 
-  it('uses the compatible env var for openai-compatible', () => {
+  it('uses the compatible env var for openai-chat-compatible', () => {
     const env = buildPiEnv(
-      makeInputs({ apiType: 'openai-compatible', apiKey: 'sk-comp', baseUrl: 'https://x/v1' }),
+      makeInputs({ apiType: 'openai-chat-compatible', apiKey: 'sk-comp', baseUrl: 'https://x/v1' }),
       '/tmp/cfg',
     );
     expect(env[PI_CUSTOM_API_KEY_ENV]).toBe('sk-comp');

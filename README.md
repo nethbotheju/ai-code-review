@@ -51,9 +51,9 @@ jobs:
     steps:
       - uses: nethbotheju/ai-code-review@v1
         with:
-          api-type: openai            # openai | openai-compatible | anthropic
+          api-type: openai            # openai | openai-chat-compatible | anthropic
           model: gpt-4o               # your model
-          # base-url: 'https://opencode.ai/zen/go/v1'   # set ONLY for openai-compatible
+          # base-url: 'https://opencode.ai/zen/go/v1'   # set ONLY for openai-chat-compatible
           api-key: ${{ secrets.AI_CODE_REVIEW_LLM_API_KEY }}
           # auto-review: 'true'           # review on open/reopen/push automatically
           # extra-instructions: '...'
@@ -136,9 +136,9 @@ A complete ready-to-paste branded workflow is in
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `api-type` | yes | — | `openai` \| `openai-compatible` \| `anthropic` |
+| `api-type` | yes | — | `openai` \| `openai-chat-compatible` \| `anthropic` |
 | `api-key` | yes | — | LLM API key (store in a secret) |
-| `base-url` | only `openai-compatible` | provider default | API base URL override |
+| `base-url` | only `openai-chat-compatible` | provider default | API base URL override |
 | `model` | yes | — | Model identifier |
 | `github-token` | no | `${{ github.token }}` | Token for reading the PR and posting the review |
 | `trigger-comment` | no | `/ai-review` | Slash command that triggers a review |
@@ -184,7 +184,7 @@ codebase before making recommendations. This uses pi's battle-tested loop
 Pi is installed on the runner via `npm install` (~170MB) on each run; the
 install only takes a few seconds, so no caching is required. The API key is
 passed via environment variable (never in argv),
-`openai-compatible` endpoints are configured via an ephemeral `models.json`, and
+`openai-chat-compatible` endpoints are configured via an ephemeral `models.json`, and
 a hard `pi-timeout-ms` guards against runaway loops (pi has no built-in step
 cap). See [`examples/workflow-agent.yml`](./examples/workflow-agent.yml)
 for a complete example.

@@ -10,7 +10,7 @@ import { parsePiOutput } from './pi-output';
 
 /**
  * Run the agent-mode review: install the pi subprocess, write an ephemeral
- * config dir (models.json for openai-compatible), spawn the CLI against the
+ * config dir (models.json for openai-chat-compatible), spawn the CLI against the
  * repo snapshot, and parse its JSONL event stream into a ReviewResult.
  */
 export async function runAgentReview(
@@ -23,7 +23,7 @@ export async function runAgentReview(
 
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-config-'));
   try {
-    if (inputs.apiType === 'openai-compatible') {
+    if (inputs.apiType === 'openai-chat-compatible') {
       fs.writeFileSync(
         path.join(configDir, 'models.json'),
         JSON.stringify(buildModelsJson(inputs), null, 2),
