@@ -32127,7 +32127,7 @@ function createModel(inputs) {
                 throw new Error("'base-url' is required when api-type is 'openai-compatible'.");
             }
             const factory = (0, openai_1.createOpenAI)({ apiKey: inputs.apiKey, baseURL: inputs.baseUrl });
-            return factory(inputs.model);
+            return factory.chat(inputs.model);
         }
         case 'anthropic': {
             const factory = (0, anthropic_1.createAnthropic)({ apiKey: inputs.apiKey });
