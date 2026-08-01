@@ -41,9 +41,9 @@ describe('providerFor', () => {
   });
 
   it('maps openai-chat-compatible to the custom provider id', () => {
-    expect(providerFor(makeInputs({ apiType: 'openai-chat-compatible', baseUrl: 'https://x/v1' }))).toBe(
-      PI_CUSTOM_PROVIDER,
-    );
+    expect(
+      providerFor(makeInputs({ apiType: 'openai-chat-compatible', baseUrl: 'https://x/v1' })),
+    ).toBe(PI_CUSTOM_PROVIDER);
   });
 });
 
